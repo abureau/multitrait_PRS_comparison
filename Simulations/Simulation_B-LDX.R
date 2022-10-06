@@ -79,10 +79,10 @@ for(i in 1:22){
   #Import the annotations of this chromosome
   annotations <- fread(paste0(".../S-LDXR/annotations/baseline-LD-X.", i, ".annot.gz")) %>% as.data.frame()
   annotations <- distinct(annotations)
-  #Be sure that the annotations are in the same order as they are in the files where thetas are estimed.
+  #Be sure that the annotations are in the same order as they are in the files where thetas are estimated.
   annotations <- annotations[, c("CHR", "BP", "SNP", "CM", estimates$ANNOT)]
   
-  #We had the missing SNPs to the annotation file.
+  #We add the missing SNPs to the annotation file.
   #For the continuous annotation, we impute using the mean value.
   match_avant_i <- lassosum:::matchpos(tomatch = data_i, ref.df = annotations,
                                  chr = "CHR", ref.chr = "CHR", pos = "POS",
@@ -93,7 +93,7 @@ for(i in 1:22){
   data_i <- data_i[match_avant_i$order,]
   data_i <- rbind(data_i, add_i)
   annot_ajout <- annot_ajout + nrow(add_i)
-  #Some SNPs are doubled, we keep only one copy.
+  #Some SNPs are duplicated, we keep only one copy.
   add2_i <- setdiff(comp_i$SNP, data_i$SNP)
   if(!length(add2_i) == 0 ){
     add2_i <- setdiff(comp_i$SNP, data_comp_i$SNP)
@@ -143,13 +143,12 @@ check <- data.frame(data$SNP, h$SNP, data$SNP == h$SNP)
 print("The order is ok ", all(check[,3]))
 saveRDS(h, ".../S-LDXR/h_rho_bysnp.RDS")
 
-#---- Create a repertory to save objects ----
+#---- Create folders to save objects ----
 for(i in 1:20){
   system(paste0("mkdir .../Simulation_", i, "/GenCov"))
 }
 
 #---- Modify the simulations ----
-#Maintenant, modification des simulations
 Data <- ".../Data"
 parsed <- parseselect(Data,extract = NULL, exclude = NULL,keep = NULL, remove = NULL,chr = NULL)
 nbr_SNP <- parsed$P
@@ -198,6 +197,10 @@ prob <- c(pi1, pi2, pi3, pi4)
 #Calculer les sd hors de la boucle, ces valeurs ne dependent pas des simulations
 sd.1 <- lassosum:::sd.bfile(bfile = Data,keep=keep.1)
 sd.2 <- lassosum:::sd.bfile(bfile = Data,keep=keep.2)
+
+# Loop over the simulation replicates
+
+
 
 for(k in 1:20){
   print(paste0("Simulation : ", k))
