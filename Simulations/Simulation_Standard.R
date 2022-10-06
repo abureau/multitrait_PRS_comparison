@@ -12,7 +12,7 @@ library(bigsnpr)
 library(bigstatsr)
 library(xgboost)
 
-Data <- ".../Data"
+Data <- ".../Data_Cartagene_imputed"
 parsed <- parseselect(Data,extract = NULL, exclude = NULL,keep = NULL, remove = NULL,chr = NULL)
 nbr_SNP <- parsed$P
 set.seed(42)
@@ -77,22 +77,6 @@ for (k in 1:20){
   Beta_simule_SKZ <- Beta[1, ]
   Beta_simule_BIP <- Beta[2, ]
   saveRDS(Beta, file = "Beta_simules.Rdata")
-
-  #Standardized betas
-  Var_Y_SKZ <- 1
-  sd_Y_SKZ <- 1
-  Var_Y_BIP <- 1
-  sd_Y_BIP <- 1
-  sd.1 <- lassosum:::sd.bfile(bfile = Data,keep=keep.1)
-  Beta0 <- matrix(data = NA, nrow = 2, ncol = nbr_SNP)
-  rownames(Beta0) <- c("SKZ", "BIP")
-  for (j in 1:nbr_SNP) {
-    Beta0[1, j] <- Beta[1, j] * (sd.1[j] / sd_Y_SKZ)
-    Beta0[2, j] <- Beta[2, j] * (sd.1[j] / sd_Y_BIP)
-  }
-  Beta0_simule_SKZ <- Beta0[1, ]
-  Beta0_simule_BIP <- Beta0[2, ]
-  saveRDS(Beta0, file = "Beta0_simules.Rdata")
 
   #Standardized betas
   Var_Y_SKZ <- 1

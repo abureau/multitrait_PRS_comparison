@@ -15,15 +15,15 @@ library(bigstatsr)
 library(xgboost)
 
 #---- Summary statistics SNPs matching ----
-#Trait 1
-ss_SKZ <- fread('Sumstats1.txt',fill = TRUE)
-size_SKZ <- sum(94015, 67390)
+#Trait 1 - Schizophrenia
+#Data are available here : https://pgc.unc.edu/for-researchers/download-results/
+ss_SKZ <- fread('PGC3_SCZ_wave3_public.v2.tsv',fill = TRUE)
 ss_SKZ$CHR <- as.numeric(ss_SKZ$CHR)
 
-#Trait 2
-ss_BIP <- fread('Sumstats2.txt')
+#Trait 2 - Bipolar disorder
+#Data are available here : https://pgc.unc.edu/for-researchers/download-results/
+ss_BIP <- fread('pgc-bip2021-all.vcf.tsv')
 names(ss_BIP)[names(ss_BIP) == '#CHROM'] <- "CHR"
-size_BIP <- sum(371549,41917)
 ss_BIP$CHR <- as.numeric(ss_BIP$CHR)
 
 #Matching the two sets of summary statistics
@@ -34,7 +34,9 @@ ss_SKZ <- ss_SKZ[matchSS$order,]
 ss_BIP <- ss_BIP[matchSS$ref.extract,]
 
 #Matching of the reference data set and the two sets of summary statistics. Alleles matching isn't necessary here.
-bim <- data.table::fread("/home/mbahda/Simulations_2021-11-03/Data_Cartagene_imputed.bim")
+#Reference data from CARTaGENE are available publicly.
+Data <- ".../Data_Cartagene_imputed"
+bim <- data.table::fread(paste0(Data, ".bim"))
 matchTest <- lassosum:::matchpos(tomatch = ss_BIP, ref.df = bim, chr = "CHR", ref.chr = "V1", pos = "POS", ref.pos = "V4", auto.detect.tomatch = F, auto.detect.ref = F, rm.duplicates = T)
 ss_BIP <- ss_BIP[matchTest$order,]
 ss_SKZ <- ss_SKZ[matchTest$order,]
@@ -67,14 +69,14 @@ Simulation_B-LDX.sh
 estimates <- fread(paste0(".../S-LDXR/out.txt"))
 #We want the continuous annotations first, then the binary ones.
 estimates <- estimates[c(54,55,56,57,59,61,62,60, 1:53,58),]
-data <- fread("/home/mbahda/Simulations_2021-11-03/Data_Cartagene_imputed.bim") %>% setNames(., c("CHR", "SNP", "CM", "POS", "A1", "A2"))
+bim <- bim %>% setNames(., c("CHR", "SNP", "CM", "POS", "A1", "A2"))
 
 #For every chromosome, we initialize an output by trait
 h <- data.frame()
 annot_ajout <- 0
 for(i in 1:22){
   print(paste0("Chromosome ", i))
-  data_i <- data[data$CHR == i,]
+  data_i <- bim[bim$CHR == i,]
   comp_i <- data_i
   #Import the annotations of this chromosome
   annotations <- fread(paste0(".../S-LDXR/annotations/baseline-LD-X.", i, ".annot.gz")) %>% as.data.frame()
@@ -93,7 +95,7 @@ for(i in 1:22){
   data_i <- data_i[match_avant_i$order,]
   data_i <- rbind(data_i, add_i)
   annot_ajout <- annot_ajout + nrow(add_i)
-  #Some SNPs are duplicated, we keep only one copy.
+  #Some SNPs are duplicated because they are triallelic, we keep only one copy.
   add2_i <- setdiff(comp_i$SNP, data_i$SNP)
   if(!length(add2_i) == 0 ){
     add2_i <- setdiff(comp_i$SNP, data_comp_i$SNP)
@@ -149,7 +151,6 @@ for(i in 1:20){
 }
 
 #---- Modify the simulations ----
-Data <- ".../Data"
 parsed <- parseselect(Data,extract = NULL, exclude = NULL,keep = NULL, remove = NULL,chr = NULL)
 nbr_SNP <- parsed$P
 set.seed(42)
@@ -207,11 +208,6 @@ for(k in 1:20){
   setwd(paste0(".../Simulation_", k, "/"))
   set.seed(k)
 
-  #Standard simulations betas
-  Vieux_beta <- readRDS("Beta_simules.Rdata")
-  Vieux_Beta_SKZ <- Vieux_beta[1, ]
-  Vieux_Beta_BIP <- Vieux_beta[2, ]
-
   #---- Simulate the new betas ----
   #Import the estimated heritabilities and covariances. SNPs are in the good order.
   heritabilite <- readRDS(".../S-LDXR/h_rho_bysnp.RDS")
@@ -255,7 +251,6 @@ for(k in 1:20){
   #Simulate the new betas.
   Beta <- matrix(data = NA, nrow = 2, ncol = nbr_SNP)
   rownames(Beta) <- c("SKZ", "BIP")
-  nProb <- 0
   for (j in 1:nbr_SNP) {
     if(heritabilite$Effect[j] == "BOTH"){
       h2_BIP <- heritabilite$h_BIP[j]
@@ -264,8 +259,9 @@ for(k in 1:20){
       h2_SKZ <- cor_SKZ*alpha_SKZ*h2_SKZ
       h2_BIP <- cor_BIP*alpha_BIP*h2_BIP
       rho <- cor*alpha*rho
+      #As explained in the paper, when the matrix determinant is not invertible, a correction needs to be done on the rho estimate.
       detCond<- ((h2_BIP*h2_SKZ)-(rho^2)) <= 0
-      if(detCond){rho <- sqrt(max(c((h2_BIP*h2_SKZ)-0.001,0))); nProb <- nProb+1}
+      if(detCond){rho <- sqrt(max(c((h2_BIP*h2_SKZ)-0.001,0)))}
       vect <- rmvnorm(1, mean = rep(0, 2), sigma = matrix(data = c(h2_SKZ, rho, rho, h2_BIP), ncol = 2))
     }else if(heritabilite$Effect[j] == "SKZ"){
       h2_SKZ <- heritabilite$h_SKZ[j]
