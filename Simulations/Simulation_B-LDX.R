@@ -200,9 +200,6 @@ sd.1 <- lassosum:::sd.bfile(bfile = Data,keep=keep.1)
 sd.2 <- lassosum:::sd.bfile(bfile = Data,keep=keep.2)
 
 # Loop over the simulation replicates
-
-
-
 for(k in 1:20){
   print(paste0("Simulation : ", k))
   setwd(paste0(".../Simulation_", k, "/"))
@@ -287,20 +284,22 @@ for(k in 1:20){
   Beta0 <- matrix(data = NA, nrow = 2, ncol = nbr_SNP)
   rownames(Beta0) <- c("SKZ", "BIP")
   for (j in 1:nbr_SNP) {
-    Beta0[1, j] <- Beta[1, j] * (sd.2[j] / sd_Y_SKZ)
-    Beta0[2, j] <- Beta[2, j] * (sd.2[j] / sd_Y_BIP)
+    Beta0[1, j] <- Beta[1, j] * (sd.1[j] / sd_Y_SKZ)
+    Beta0[2, j] <- Beta[2, j] * (sd.1[j] / sd_Y_BIP)
   }
   Beta0_simule_SKZ <- Beta0[1, ]
   Beta0_simule_BIP <- Beta0[2, ]
-  saveRDS(Beta0, file = "GenCov/Beta0_simules_jeu2.Rdata")
+  saveRDS(Beta0, file = "GenCov/Beta0_simules.Rdata")
 
-  #correlations
+  #Object to compute the correlation.
   LDblocks <- "EUR.hg19"
   ref.bim <- read.table2(paste0(Data, ".bim"))
   LDblocks <- read.table2(system.file(paste0(
     "data/Berisa.",
     LDblocks, ".bed"
-  ), package = "lassosum"), header = T)
+  ),
+  package = "lassosum"
+  ), header = T)
   LDblocks[, 1] <- as.character(sub("chr", "", LDblocks[, 1], ignore.case = T))
   LDblocks <- splitgenome(
     CHR = ref.bim$V1,
@@ -311,18 +310,50 @@ for(k in 1:20){
   Blocks <- parseblocks(LDblocks)
   Blocks$startvec <- Blocks$startvec + 1
   Blocks$endvec <- Blocks$endvec + 1
-  pos.2 <- which(parsed.2$keep) - 1
-  keepbytes.2 <- floor(pos.2 / 4)
-  keepoffset.2 <- pos.2 %% 4 * 2
+  pos.1 <- which(parsed.1$keep) - 1
+  keepbytes.1 <- floor(pos.1 / 4)
+  keepoffset.1 <- pos.1 %% 4 * 2
   n_SKZ <- sum(33426, 32541)
   n_BIP <- sum(21524, 20129)
   cores <- detectCores()
   cl <- makeCluster(cores[1]-10)
   registerDoParallel(cl)
-  ptm <- proc.time()
+
+  #Correlations in the first data set used as a reference.
   r_SKZ <- c()
   r_BIP <- c()
-  
+  for (i in 1:length(Blocks$startvec)) {
+    region <- c(Blocks$startvec[i]:Blocks$endvec[i])
+    extract_region <- rep(FALSE,nbr_SNP)
+    extract_region[region] <- TRUE
+    parsed.ref_region <- parseselect(Data, keep = keep.1, extract = extract_region)
+    extract2 <- selectregion(!parsed.ref_region$extract)
+    extract2[[1]] <- extract2[[1]] - 1
+    genotypeMatrix_region <- genotypeMatrix(
+    fileName = paste0(Data, ".bed"), N = parsed.ref_region$N, P = parsed.ref_region$P,
+    col_skip_pos = extract2[[1]], col_skip = extract2[[2]],
+    keepbytes = keepbytes.1, keepoffset = keepoffset.1, fillmissing = 1
+    )
+    if (length(region) > 1) {
+      R_region <- cor(x = genotypeMatrix_region)
+    }else {
+      R_region <- matrix(data = 1, nrow = 1, ncol = 1)
+    }
+    Beta0_region <- as.matrix(Beta0[, region])
+    r_SKZ_region <- rmvnorm(1, mean = R_region %*% Beta0_region[1, ], sigma = R_region / n_SKZ)
+    r_SKZ <- append(x = r_SKZ, values = r_SKZ_region)
+    r_BIP_region <- rmvnorm(1, mean = R_region %*% Beta0_region[2, ], sigma = R_region / n_BIP)
+    r_BIP <- append(x = r_BIP, values = r_BIP_region)
+  }
+  r <- rbind(r_SKZ,r_BIP)
+  r_SKZ <- r[1,]
+  r_BIP <- r[2,]
+  saveRDS(r_SKZ, file = "GenCov/r_SKZ_simules.Rdata")
+  saveRDS(r_BIP, file = "GenCov/r_BIP_simules.Rdata")
+
+  #Correlations in the second data set used for validation.
+  r_SKZ <- c()
+  r_BIP <- c()
   for (i in 1:length(Blocks$startvec)) {
     region <- c(Blocks$startvec[i]:Blocks$endvec[i])
     extract_region <- rep(FALSE,nbr_SNP)
@@ -347,16 +378,12 @@ for(k in 1:20){
     r_BIP_region <- rmvnorm(1, mean = R_region %*% Beta0_region[2, ], sigma = R_region / n_BIP)
     r_BIP <- append(x = r_BIP, values = r_BIP_region)
   }
-  stopCluster(cl)
-  proc.time() - ptm
-  time1 <- proc.time() - ptm
-  time1
-  
   r <- rbind(r_SKZ,r_BIP)
   r_SKZ <- r[1,]
   r_BIP <- r[2,]
-  saveRDS(r_SKZ, file = "GenCov/r_SKZ_simules_jeu2.Rdata")
-  saveRDS(r_BIP, file = "GenCov/r_BIP_simules_jeu2.Rdata")
+  saveRDS(r_SKZ, file = "GenCovNewSim/r_SKZ_simules_jeu2.Rdata")
+  saveRDS(r_BIP, file = "GenCovNewSim/r_BIP_simules_jeu2.Rdata")
+  stopCluster(cl)
 
   #Simulated PRSs
   PGS_simule_SKZ <- pgs(Data, keep=parsed.3$keep, weights=Beta_simule_SKZ)
