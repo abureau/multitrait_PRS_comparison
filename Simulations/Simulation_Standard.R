@@ -94,7 +94,7 @@ for (k in 1:20){
   Beta0_simule_BIP <- Beta0[2, ]
   saveRDS(Beta0, file = "Beta0_simules.Rdata")
 
-  #Object to compute the correlation.
+  #Objects to compute the correlation.
   LDblocks <- "EUR.hg19"
   ref.bim <- read.table2(paste0(Data, ".bim"))
   LDblocks <- read.table2(system.file(paste0(

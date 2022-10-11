@@ -195,7 +195,6 @@ pi2 <- Var_SKZ_beta / sigma2 - pi1
 pi3 <- Var_BIP_beta / sigma2 - pi1
 pi4 <- 1 - pi1 - pi2 - pi3
 prob <- c(pi1, pi2, pi3, pi4)
-#Calculer les sd hors de la boucle, ces valeurs ne dependent pas des simulations
 sd.1 <- lassosum:::sd.bfile(bfile = Data,keep=keep.1)
 sd.2 <- lassosum:::sd.bfile(bfile = Data,keep=keep.2)
 
@@ -291,7 +290,7 @@ for(k in 1:20){
   Beta0_simule_BIP <- Beta0[2, ]
   saveRDS(Beta0, file = "GenCov/Beta0_simules.Rdata")
 
-  #Object to compute the correlation.
+  #Objects to compute the correlation.
   LDblocks <- "EUR.hg19"
   ref.bim <- read.table2(paste0(Data, ".bim"))
   LDblocks <- read.table2(system.file(paste0(
