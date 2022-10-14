@@ -129,7 +129,7 @@ f_lambda <- function(beta_SKZ_lambda, beta_BIP_lambda, r_hat,sd,keep_sujets,beta
   return(result)
 }
 
-#Compute LDscore using PLINK for PANPRS in the method reference bfiles.
+#Compute LD matrix using PLINK for PANPRS in the method reference bfiles.
 system(paste0(".../plink --bfile ", Data, " --keep .../keep.2.txt --r2 --ld-window-kb 250 --out .../PANPRSLD"))
 plinkLDgenome <- data.table::fread(".../PANPRSLD.ld")
 colnames(plinkLDgenome) <- c("CHR_A", "BP_A",  "SNP_A", "CHR_B", "BP_B",  "SNP_B", "R")
@@ -158,13 +158,13 @@ for (k in 1:20) {
   pos.1 <- which(parsed.1$keep) - 1
   keepbytes.1 <- floor(pos.1 / 4)
   keepoffset.1 <- pos.1 %% 4 * 2
-  r_SKZ <- readRDS("/r_SKZ_simules.Rdata")
-  r_BIP <- readRDS("/r_BIP_simules.Rdata")
+  r_SKZ <- readRDS(".../r_SKZ_simules.Rdata")
+  r_BIP <- readRDS(".../r_BIP_simules.Rdata")
   r_SKZ_destand <- r_SKZ*(1/sd.1)
   r_BIP_destand <- r_BIP*(1/sd.1)
   r <- rbind(r_SKZ,r_BIP)
-  r_SKZ.2 <- as.vector(readRDS("r_SKZ_simules_jeu2.Rdata"))
-  r_BIP.2 <- as.vector(readRDS("r_BIP_simules_jeu2.Rdata"))
+  r_SKZ.2 <- as.vector(readRDS(".../r_SKZ_simules_jeu2.Rdata"))
+  r_BIP.2 <- as.vector(readRDS(".../r_BIP_simules_jeu2.Rdata"))
   r.2 <- c(rbind(r_SKZ,r_BIP))
   #Number of cases and controls used in the summary statitics GWAS.
   #Values obtained using the references of the summary statistics (see Simulation_Standard.R).
@@ -182,10 +182,9 @@ for (k in 1:20) {
                  backingfile = ".../Data_Cartagene_imputed.rds",
                  ncores = NCORES)
   }
-  threshold_param <- c(1, 0.9, 0.8, 0.7, 0.6, 0.5)
+  threshold_param <- c(1, 0.75, 0.5, 0.25, 0.1, 0.05, 0.001, 1e-4)
   obj.bigSNP <- snp_attach(".../Data_Cartagene_imputed.rds")
-  G   <- obj.bigSNP$genotypes
- 
+
   #Validation
   ##SKZ
   for(Lam in threshold_param){
@@ -194,6 +193,8 @@ for (k in 1:20) {
     if(which(threshold_param == Lam) == 1) {BETA_SKZ <- data.frame(add) } else {BETA_SKZ <- cbind(BETA_SKZ, add)}
   }
   cl <- makeCluster(cores[1]-2) 
+  #We use the pseudovalidate function from the lassosum package for validation as we're using correlation from the same set as the one
+  #used to modelize lassosum. (date set #2)
   pv_SKZ <- lassosum:::pseudovalidation(Data, beta = BETA_SKZ, cor = r_SKZ.2, keep = parsed.2$keep, sd = sd.2, cluster = cl)
   stopCluster(cl)
   x_SKZ <- as.vector(pv_SKZ)
@@ -207,6 +208,8 @@ for (k in 1:20) {
     if(which(threshold_param == Lam) == 1) {BETA_BIP <- data.frame(add) } else {BETA_BIP <- cbind(BETA_BIP, add)}
   }
   cl <- makeCluster(cores[1]-2) 
+  #We use the pseudovalidate function from the lassosum package for validation as we're using correlation from the same set as the one
+  #used to modelize lassosum. (date set #2)
   pv_BIP <- lassosum:::pseudovalidation(Data, beta = BETA_BIP, cor = r_BIP.2, keep = parsed.2$keep, sd = sd.2, cluster = cl)
   stopCluster(cl)
   x_BIP <- as.vector(pv_BIP)
@@ -264,9 +267,8 @@ for (k in 1:20) {
   }
 
   #---- MultiLassosum ADAPTIVE (BETA STANDARD) ----
-  AW <- out_lassosumExt
   max_x_lassosumExt <- which.max(x_lassosumExt)
-  AW <- t(AW$beta[,c((2*max_x_lassosumExt)-1, 2*max_x_lassosumExt)])
+  AW <- t(MultiLassosum$beta[,c((2*max_x_lassosumExt)-1, 2*max_x_lassosumExt)])
   AW[1,] <- 1/abs(AW[1,]*weight.2)
   AW[2,] <- 1/abs(AW[2,]*weight.2)
   saveRDS(AW, file =  "BetaMulti/Adaptive_weights.Rdata")
@@ -353,9 +355,8 @@ for (k in 1:20) {
   }
 
   #---- MultiLassosum ADAPTIVE (BETA GENETIC COV) ----
-  AW <- out_lassosumGenCov
   max_x_lassosumGenCov <- which.max(x_lassosumGenCov)
-  AW <- t(AW$beta[,c((2*max_x_lassosumGenCov)-1, 2*max_x_lassosumGenCov)])
+  AW <- t(out_lassosumGenCov$beta[,c((2*max_x_lassosumGenCov)-1, 2*max_x_lassosumGenCov)])
   AW[1,] <- 1/abs(AW[1,]*weight.2)
   AW[2,] <- 1/abs(AW[2,]*weight.2)
   saveRDS(AW, file =  "BetaGenCov/Adaptive_weights.Rdata")
@@ -467,17 +468,17 @@ for (k in 1:20) {
     PANPRSchr <- SummaryLasso::gsPEN(summaryZ = ZmatrixChr, Nvec = c(size_SKZ, size_BIP), plinkLD = plinkLD, NumIter = 1000, breaking = 1, 
         numChrs = 1, ChrIndexBeta = 0, Init_summaryBetas = 0, Zscale = 1, 
         RupperVal = NULL, tuningMatrix = initialTuning, penalty = "mixLOG", outputAll = 0, fit = TRUE)
-    tuningChr <- apply(PANPRS64chr$tuningMatrix, 1, FUN = function(x){paste0(round(x,4), collapse = "-")})
+    tuningChr <- apply(PANPRSchr$tuningMatrix, 1, FUN = function(x){paste0(round(x,4), collapse = "-")})
     
     if(chr==1){
-      PANPRS <- PANPRS64chr
+      PANPRS <- PANPRSchr
       PANPRS$Numitervec <- NULL
       tuning <- tuningChr
     }else{
       tuningKeep <- intersect(tuning, tuningChr)
       tuningCritChr <- which(tuningChr %in% tuningKeep)
       tuningCrit <- which(tuning %in% tuningKeep)
-      PANPRS$BetaMatrix <- cbind(PANPRS$BetaMatrix[tuningCrit,], PANPRS64chr$BetaMatrix[tuningCritChr,])
+      PANPRS$BetaMatrix <- cbind(PANPRS$BetaMatrix[tuningCrit,], PANPRSchr$BetaMatrix[tuningCritChr,])
       PANPRS$tuningMatrix <- PANPRS$tuningMatrix[tuningCrit,]
       tuning <- tuningKeep
     }
@@ -524,6 +525,7 @@ for (k in 1:20) {
   }
   
   #---- LDPRED2 ----
+  G   <- obj.bigSNP$genotypes
   CHR <- as.integer(obj.bigSNP$map$chromosome)
   POS <- obj.bigSNP$map$physical.pos
   y   <- obj.bigSNP$fam$affection - 1
@@ -548,7 +550,6 @@ for (k in 1:20) {
   h2_est_SKZ <- 0.47
   multi_auto_SKZ <- snp_ldpred2_auto(corr0, df_beta_SKZ, h2_init = h2_est_SKZ, vec_p_init = seq_log(1e-4, 0.5, length.out = 30), ncores = NCORES, sparse = TRUE)
   saveRDS(multi_auto_SKZ, file = ".../LDpred2/multi_auto_SKZ.Rdata")
-  beta_auto_SKZ <- sapply(multi_auto_SKZ, function(auto) auto$beta_est)
   beta_auto_SKZ_sparse <- sapply(multi_auto_SKZ, function(auto) auto$beta_est_sparse)
   pred_auto_SKZ <- big_prodMat(G, beta_auto_SKZ_sparse, ind.row = rows_3)
   sc <- apply(pred_auto_SKZ, 2, sd)
@@ -559,14 +560,13 @@ for (k in 1:20) {
   final_pred_auto_SKZ <- rowMeans(pred_auto_SKZ[, keep])
   saveRDS(final_pred_auto_SKZ, file = ".../LDpred2/PGS_estime_SKZ_LDpred2_prodMat.Rdata")
   
-  #LDPRED2 on SBIP
+  #LDPRED2 on BIP
   df_beta_BIP <- as.data.frame(df_beta_BIP)
   ldsc_BIP <- snp_ldsc2(corr, df_beta_BIP)
   #We use the heritability value that was fixed in the simulation
   h2_est_BIP <- 0.45
   multi_auto_BIP <- snp_ldpred2_auto(corr0, df_beta_BIP, h2_init = h2_est_BIP, vec_p_init = seq_log(1e-4, 0.5, length.out = 30), ncores = NCORES, sparse = TRUE)
   saveRDS(multi_auto_BIP, file = ".../LDpred2/multi_auto_BIP.Rdata")
-  beta_auto_BIP <- sapply(multi_auto_BIP, function(auto) auto$beta_est)
   beta_auto_BIP_sparse <- sapply(multi_auto_BIP, function(auto) auto$beta_est_sparse)
   pred_auto_BIP <- big_prodMat(G, beta_auto_BIP_sparse, ind.row = rows_3)
   sc <- apply(pred_auto_BIP, 2, sd)

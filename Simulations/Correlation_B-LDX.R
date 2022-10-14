@@ -9,10 +9,8 @@ for(k in 1:20){
 	#Thresholding
 	valid_SKZ <- readRDS("Valeurs_f_lambda_thresholding_SKZ.Rdata")
 	valid_BIP <- readRDS("Valeurs_f_lambda_thresholding_BIP.Rdata")
-	order_SKZ <- sort(valid_SKZ)
-	order_SKZ <- order_SKZ[length(order_SKZ):1]
-	order_BIP <- sort(valid_BIP)
-	order_BIP <- order_BIP[length(order_BIP):1]
+	order_SKZ <- sort(valid_SKZ, decreasing=T)
+	order_BIP <- sort(valid_BIP, decreasing=T)
 	for(j in 1:length(valid_SKZ)){
 		order_SKZ_j <- which(order_SKZ == valid_SKZ[j])
 		order_BIP_j <- which(order_BIP == valid_BIP[j])
@@ -25,8 +23,7 @@ for(k in 1:20){
 
 	#MultivariateLassosum
 	valid <- readRDS("Valeurs_f_lambda_LassosumExtension.Rdata")
-	order <- sort(valid)
-	order <- order[length(order):1]
+	order <- sort(valid, decreasing=T)
 	for(j in 1:length(valid)){
 		order_j <- which(order == valid[j])
 		val <- strsplit(x = names(valid[j]), split = "_", fixed = TRUE)[[1]][2]
@@ -37,8 +34,7 @@ for(k in 1:20){
 
 	#multivariateLassosum Genetic cov
 	valid <- readRDS("GenCov/Valeurs_f_lambda_LassosumExtension.Rdata")
-	order <- sort(valid)
-	order <- order[length(order):1]
+	order <- sort(valid, decreasing=T)
 	for(j in 1:length(valid)){
 		order_j <- which(order == valid[j])
 		val <- strsplit(x = names(valid[j]), split = "_", fixed = TRUE)[[1]][2]
@@ -50,8 +46,7 @@ for(k in 1:20){
 
 	#multivariateLassosum adaptive (Beta from multivariateLassosum Genetic Cov)
 	valid <- readRDS("BetaMulti/Valeurs_f_lambda_LassosumExtension.Rdata")
-	order <- sort(valid)
-	order <- order[length(order):1]
+	order <- sort(valid, decreasing=T)
 	for(j in 1:length(valid)){
 		order_j <- which(order == valid[j])
 		val <- strsplit(x = names(valid[j]), split = "_", fixed = TRUE)[[1]][2]
@@ -61,9 +56,8 @@ for(k in 1:20){
 	}
 
 	#multivariateLassosum adaptive (Beta from multivariateLassosum standard)
-	valid <- readRDS("BetaGenCov/Valeurs_f_lambda_LassosumExtension.Rdata"))
-	order <- sort(valid)
-	order <- order[length(order):1]
+	valid <- readRDS("BetaGenCov/Valeurs_f_lambda_LassosumExtension.Rdata")
+	order <- sort(valid, decreasing=T)
 	for(j in 1:length(valid)){
 		order_j <- which(order == valid[j])
 		val <- strsplit(x = names(valid[j]), split = "_", fixed = TRUE)[[1]][2]
@@ -75,10 +69,8 @@ for(k in 1:20){
 	#Lassosum
 	valid_SKZ <- readRDS("OG/Valeurs_f_lambda_Lassosum_SKZ.Rdata")
 	valid_BIP <- readRDS("OG/Valeurs_f_lambda_Lassosum_BIP.Rdata")
-	order_SKZ <- sort(valid_SKZ)
-	order_SKZ <- order_SKZ[length(order_SKZ):1]
-	order_BIP <- sort(valid_BIP)
-	order_BIP <- order_BIP[length(order_BIP):1]
+	order_SKZ <- sort(valid_SKZ, decreasing=T)
+	order_BIP <- sort(valid_BIP, decreasing=T)
 	for(j in 1:length(valid_SKZ)){
 		order_SKZ_j <- which(order_SKZ == valid_SKZ[j])
 		order_BIP_j <- which(order_BIP == valid_BIP[j])
@@ -92,13 +84,10 @@ for(k in 1:20){
 	#PANPRS
 	valid <- readRDS("PANPRS/Valeurs_f_lambda_PANPRS.Rdata")
 	validmax <- which.max(valid)
-	valid <- valid[!is.nan(valid)]
-	order <- sort(valid)
-	order <- order[length(order):1]
-	order <- order[1:3]
+	#There is a lot of parameters, we keep the 3 best.
+	order <- sort(valid, decreasing=T)[1:3]
 	for(j in 1:length(order)){
-		val <- order[j]
-                val <- names(val)
+    val <- names(order[j])
 		order_j <- which(names(order) == val)
 		PANPRS_SKZ <- readRDS(paste0("PANPRS/PGS_estime_SKZ_", val,".Rdata"))
 		PANPRS_BIP <- readRDS(paste0("PANPRS/PGS_estime_BIP_", val,".Rdata"))
