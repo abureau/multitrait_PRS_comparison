@@ -11,34 +11,34 @@ library(purrr)
 library(doParallel)
 setwd(".../RealData")
 
-#Control for MAF<0.1 on european subjects is already done. Data are found in
+#Control for MAF<0.1 on European subjects is already done. Data are found in
 #.../RealData/Data/methodRef bfiles.
 
 #---- Clumping, pvalue minimum ----
-#Reference panel (CARTaGENE)
+#Reference panel (1000 Genome).
 ref.bfile <- "Data/methodRef"
 Xr <- bigsnpr::bed(paste0(ref.bfile,".bed"))
 
 #Sumstats
-#SKZ
+#SKZ.
 ss_SKZ <- fread('PGC3_SCZ_wave3_public.v2.tsv',fill = TRUE)
 size_SKZ <- sum(94015, 67390)
 ss_SKZ$CHR <- as.numeric(ss_SKZ$CHR)
 
-#BIP
+#BIP.
 ss_BIP <- fread('pgc-bip2021-all.vcf.tsv')
 names(ss_BIP)[names(ss_BIP) == '#CHROM'] <- "CHR"
 size_BIP <- sum(371549,41917)
 ss_BIP$CHR <- as.numeric(ss_BIP$CHR)
 
-#Matching of the sumstats SKZ and BIP (number of common SNPs = 7 540 573)
+#Matching of the sumstats SKZ and BIP (number of SNPs in common = 7 540 573)
 matchSS <- lassosum:::matchpos(tomatch = ss_SKZ, ref.df = ss_BIP, auto.detect.tomatch = F, auto.detect.ref = F,
   chr = "CHR", ref.chr = "CHR", pos = "BP", ref.pos = "POS", ref = "A1", ref.ref = "A1", alt = "A2", ref.alt = "A2",
   exclude.ambiguous = F, silent = F, rm.duplicates = F)
 ss_SKZ <- ss_SKZ[matchSS$order,]
 ss_BIP <- ss_BIP[matchSS$ref.extract,]
 
-#Matching of the reference data set with the sumstats (ss_BIP and ss_SKZ are already in the same order) (number of common SNPs = 3 639 921)
+#Matching of the reference data set with the sumstats (ss_BIP and ss_SKZ are already in the same order) (number of SNPs in common = 3 639 921)
 #To be sure that every SNP in the reference panel has a pvalue.
 matchXr <- lassosum:::matchpos(tomatch = Xr, ref.df = ss_BIP, auto.detect.tomatch = F, auto.detect.ref = F,
   chr = "V1", ref.chr = "CHR", pos = "V4", ref.pos = "POS", ref = "V5", ref.ref = "A1", alt = "V6", ref.alt = "A2",
@@ -47,7 +47,7 @@ Xr <- Xr[matchRef$order,]
 ss_BIP <- ss_BIP[matchXr$ref.extract,]
 ss_SKZ <- ss_SKZ[matchXr$ref.extract,]
 
-#Minimum p-value.
+#Minimum p-value between BIP and SKZ symstats.
 out <- data.frame("SNP" = Xr$V2, "pval" = apply(data.frame(ss_SKZ$P, ss_BIP$PVAL), 1, min))
 out <- data.table::data.table(out)
 data.table::fwrite(out, "Data/pvalueClumping.txt", row.names = FALSE, sep = "\t", col.names = TRUE)
@@ -72,7 +72,7 @@ omnibim <- data.table::fread(paste0(Omni, ".bim"))
 GSA <- "Data/methodGSA"
 GSAbim <- data.table::fread(paste0(GSA, ".bim"))
 
-#Matching of the reference data set after clumping with the sumstats (number of common SNPs = 365 527)
+#Matching of the reference data set after clumping with the sumstats (number of SNPs in common = 365 527)
 matchRef <- lassosum:::matchpos(tomatch = refbim, ref.df = ss_BIP, auto.detect.tomatch = F, auto.detect.ref = F,
   chr = "V1", ref.chr = "CHR", pos = "V4", ref.pos = "POS", ref = "V5", ref.ref = "A1", alt = "V6", ref.alt = "A2",
   exclude.ambiguous = F, silent = F, rm.duplicates = F)
@@ -80,7 +80,7 @@ XrOrder <- matchRef$order
 ss_BIP <- ss_BIP[matchRef$ref.extract,]
 ss_SKZ <- ss_SKZ[matchRef$ref.extract,]
 
-#Matching of the OmniExpress data set with the sumstats (number of common SNPs = 365 527)
+#Matching of the OmniExpress data set with the sumstats (number of SNPs in common = 365 527)
 matchTest <- lassosum:::matchpos(tomatch = omnibim, ref.df = ss_BIP, auto.detect.tomatch = F, auto.detect.ref = F,
   chr = "V1", ref.chr = "CHR", pos = "V4", ref.pos = "POS", ref = "V5", ref.ref = "A1", alt = "V6", ref.alt = "A2",
   exclude.ambiguous = F, silent = F, rm.duplicates = F)
@@ -89,7 +89,7 @@ ss_BIP <- ss_BIP[matchTest$ref.extract,]
 ss_SKZ <- ss_SKZ[matchTest$ref.extract,]
 XrOrder <- XrOrder[matchTest$ref.extract]
 
-#Matching of the GSA data set with the sumstats (number of common SNPs = 365 527)
+#Matching of the GSA data set with the sumstats (number of SNPs in common = 365 527)
 matchTestGSA <- lassosum:::matchpos(tomatch = GSAbim, ref.df = ss_BIP, auto.detect.tomatch = F, auto.detect.ref = F,
   chr = "V1", ref.chr = "CHR", pos = "V4", ref.pos = "POS", ref = "V5", ref.ref = "A1", alt = "V6", ref.alt = "A2",
   exclude.ambiguous = F, silent = F, rm.duplicates = F)
@@ -99,14 +99,14 @@ ss_SKZ <- ss_SKZ[matchTestGSA$ref.extract,]
 testOrder <- testOrder[matchTestGSA$ref.extract]
 XrOrder <- XrOrder[matchTestGSA$ref.extract]
 
-#Correlations
+#From p-values to correlations.
 cor_BIP <- lassosum::p2cor(p = ss_BIP$PVAL, n = size_BIP, sign=ss_BIP$BETA)
 cor_SKZ <- lassosum::p2cor(p = ss_SKZ$P, n = size_SKZ, sign=log(ss_SKZ$OR))
 
 #Let's generate the pseudo sumstats
 #The reference panel needs to be centered and scaled
 #xi=(mi-2pi)/sqrt(2pi(1-pi)) where pi is the minor allele frequency
-#of the ith genetic marker and mi is the ith column vector of the allele count matrix M
+#of the ith genetic marker and mi is the ith column vector of the allele count matrix M.
 nAverage <- mean(c(size_BIP, size_SKZ))
 nB <- 0.1*nAverage
 nr <- Xr$nrow
@@ -126,7 +126,7 @@ for(i in 1:dim(XrCounts)[2]){
 }
 Xtrg <- bigsnpr::bed_cprodVec(obj.bed = Xr, y.row = g, ind.col = XrOrder, center = XrMeans[XrOrder], scale = XrSds[XrOrder])
 
-#SKZ pseudo sumstats
+#SKZ pseudo sumstats.
 n_SKZ <- size_SKZ
 nA_SKZ <- n_SKZ - nB
 r_SKZ <- cor_SKZ
@@ -136,7 +136,7 @@ rB_SKZ <- (1/nB)*(n_SKZ*r_SKZ - nA_SKZ*rA_SKZ)
 ssA_SKZ <- ss_SKZ
 ssB_SKZ <- ss_SKZ
 
-#BIP pseudo sumstats
+#BIP pseudo sumstats.
 n_BIP <- size_BIP
 nA_BIP <- n_BIP - nB
 r_BIP <- cor_BIP
@@ -178,7 +178,7 @@ ss_BIP <- dplyr::select(ss_BIP, -DIRE, -NGT, -IMPINFO, - NEFFDIV2)
 ssA_BIP <- dplyr::select(ssA_BIP, -DIRE, -NGT, -IMPINFO, - NEFFDIV2) 
 ssB_BIP <- dplyr::select(ssB_BIP, -DIRE, -NGT, -IMPINFO, - NEFFDIV2) 
 
-#Exportation of the sumstats where only the common SNPs are found and of the new pseudo sumstats.
+#Exportation of the new pseudo sumstats.
 data.table::fwrite(ssA_SKZ, "PANPRS/Data/ssA_SKZ.txt")
 data.table::fwrite(ssA_BIP, "PANPRS/Data/ssA_BIP.txt")
 data.table::fwrite(ssB_SKZ, "PANPRS/Data/ssB_SKZ.txt")
@@ -193,7 +193,7 @@ system(".../plink --bfile .../PANPRS/Data/methodOmni --extract .../PANPRS/Data/m
 system(".../plink --bfile .../PANPRS/Data/methodGSA --extract .../PANPRS/Data/markerClumpedGSA.txt --make-bed --out .../PANPRS/Data/methodGSA")
 
 #---- PANPRS ----
-#Jeu de test Omni et GSA
+#Test data OmniExpress and GSA
 omni <- "PANPRS/Data/methodOmni"
 omnibim <- data.table::fread(paste0(omni, ".bim"))
 sdOmni <- lassosum:::sd.bfile(bfile = omni)
@@ -216,7 +216,8 @@ size_BIP <- sum(371549, 41917)
 ss_BIP <- ss_BIP[ss_BIP$ID %in% ssA_BIP$ID]
 corB_BIP <- ssB_BIP$Cor
 
-#Faire le matching avec le .bim des deux jeux de test
+#Just to validate that sumstats are in the same order as the OmniExpress and GSA test data sets.
+#If not, be sure that every data sets are in the same SNPs order before using the methods.
 matchOmni <- lassosum:::matchpos(tomatch = omnibim, ref.df = ssA_SKZ, auto.detect.tomatch = F, auto.detect.ref = F,
   chr = "V1", ref.chr = "CHR", pos = "V4", ref.pos = "BP", ref = "V5", ref.ref = "A1", alt = "V6", ref.alt = "A2",
   exclude.ambiguous = F, silent = F, rm.duplicates = F)
@@ -253,29 +254,29 @@ row.names(Zmatrix) <- omni$V2[matchOmni$order]
 system(paste0(".../plink --bfile ", omni, " --r2 --ld-window-kb 250 --out .../PANPRS/Data/PANPRSLD-RefOmni"))
 plinkLDgenome <- fread("PANPRS/Data/PANPRSLD-RefOmni.ld")
 colnames(plinkLDgenome) <- c("CHR_A", "BP_A",  "SNP_A", "CHR_B", "BP_B",  "SNP_B", "R")
-#generate the set of tuning parameters on a modified version of gsPEN which doesn't fit the model, but only outputs the tuning matrix.
+#Generate the set of tuning parameters on a modified version of gsPEN which doesn't fit the model, but only outputs the tuning matrix.
 initialTuning <- SummaryLasso::gsPEN(summaryZ = Zmatrix, Nvec = c(size_SKZ, size_BIP), plinkLD = plinkLDgenome, numChrs = 2, fit = FALSE) 
 
 for(chr in 1:22){
-  system(paste0(".../plink --bfile ", omni, " --chr ", chr , " --r2 --ld-window-kb 250 --out .../PANPRS/Data/PANPRSLD-RefOmni-chr", chr"))
+  system(paste0(".../plink --bfile ", omni, " --chr ", chr , " --r2 --ld-window-kb 250 --out .../PANPRS/Data/PANPRSLD-RefOmni-chr", chr))
   plinkLD <- data.table::fread(paste0(".../PANPRS/Data/PANPRSLD-RefOmni-chr", chr, ".ld"))
   colnames(plinkLD) <- c("CHR_A", "BP_A",  "SNP_A", "CHR_B", "BP_B",  "SNP_B", "R")
   plinkLD <- as.data.frame(plinkLD)
   ZmatrixChr <- Zmatrix[ssA_SKZ$CHR == chr,]
-  PANPRS64chr <- PANPRS64::gsPEN(summaryZ = ZmatrixChr, Nvec = c(size_SKZ, size_BIP), plinkLD = plinkLD, NumIter = 1000, breaking = 1, 
+  PANPRSchr <- summaryLasso::gsPEN(summaryZ = ZmatrixChr, Nvec = c(size_SKZ, size_BIP), plinkLD = plinkLD, NumIter = 1000, breaking = 1, 
     numChrs = 1, ChrIndexBeta = 0, Init_summaryBetas = 0, Zscale = 1, 
-    RupperVal = NULL, tuningMatrix = initialTuning, penalty = c("mixLOG"), outputAll = 0, Fit = TRUE)
-  saveRDS(PANPRS64chr, paste0("PANPRS/Results/PANPRS-chr", chr, ".RDS"))
-  tuningChr <- apply(PANPRS64chr$tuningMatrix, 1, FUN = function(x){paste0(round(x,4), collapse = "-")})
+    RupperVal = NULL, tuningMatrix = initialTuning, penalty = c("mixLOG"), outputAll = 0, fit = TRUE)
+  saveRDS(PANPRSchr, paste0("PANPRS/Results/PANPRS-chr", chr, ".RDS"))
+  tuningChr <- apply(PANPRSchr$tuningMatrix, 1, FUN = function(x){paste0(round(x,4), collapse = "-")})
   if(chr==1){
-    PANPRS <- PANPRS64chr
+    PANPRS <- PANPRSchr
     PANPRS$Numitervec <- NULL
     tuning <- tuningChr
   }else{
     tuningKeep <- intersect(tuning, tuningChr)
     tuningCritChr <- which(tuningChr %in% tuningKeep)
     tuningCrit <- which(tuning %in% tuningKeep)
-    PANPRS$BetaMatrix <- cbind(PANPRS$BetaMatrix[tuningCrit,], PANPRS64chr$BetaMatrix[tuningCritChr,])
+    PANPRS$BetaMatrix <- cbind(PANPRS$BetaMatrix[tuningCrit,], PANPRSchr$BetaMatrix[tuningCritChr,])
     PANPRS$tuningMatrix <- PANPRS$tuningMatrix[tuningCrit,]
     tuning <- tuningKeep
   }
@@ -294,7 +295,7 @@ NbrLambdas <- dim(PANPRS$tuningMatrix)[1]
 mat_Beta_SKZ <- PANPRS$BetaMatrix[,whereSKZ]
 mat_Beta_BIP <- PANPRS$BetaMatrix[,whereBIP]
 
-#Be sure that the betas are in the same order as the bim file of the omni set
+#Be sure that the betas are in the same SNP order as they are in the bim file of the OmniExpress data set.
 order <- match(omnibim$V2, orderSKZ)
 mat_Beta_SKZ <- mat_Beta_SKZ[,order]
 mat_Beta_BIP <- mat_Beta_BIP[,order]
@@ -314,7 +315,7 @@ x <- f_lambda(beta_SKZ_lambda = t(mat_Beta_SKZ), beta_BIP_lambda = t(mat_Beta_BI
 names(x) <- apply(PANPRS$tuningMatrix[DiffZeroCrit,], 1, FUN = function(x){paste0(round(x,4), collapse = "-")})
 saveRDS(x, file = "PANPRS/Results/Valeurs_f_lambda_PANPRS.Rdata")
 
-#Finally, watch out for allele order
+#Finally, watch out for allele order.
 matchOmni <- lassosum:::matchpos(tomatch = ssA_SKZ, ref.df = omnibim , auto.detect.tomatch = F, auto.detect.ref = F,
   chr = "CHR", ref.chr = "V1", pos = "BP", ref.pos = "V4", ref = "A1", ref.ref = "V5", alt = "A2", ref.alt = "V6",
   exclude.ambiguous = F, silent = F, rm.duplicates = F)
@@ -324,6 +325,7 @@ matchGSA <- lassosum:::matchpos(tomatch = ssA_SKZ, ref.df = testGSA.bim , auto.d
 
 
 #PRS Omni
+#Reverse alleles if necessary
 AllLambdas <- names(x)
 AllLambdasMax <- which.max(x)
 Lam <- AllLambdas[AllLambdasMax]
@@ -337,6 +339,7 @@ PGS_estime_BIP <- pgs(omni, weights=scaled.beta_estime_BIP)
 saveRDS(PGS_estime_BIP, file = paste0("PANPRS/Results/PANPRSOmniBIP.RDS"))
 
 #PRS GSA
+#Reverse alleles if necessary
 # SKZ
 scaled.beta_estime_SKZ <- as.matrix(t(mat_Beta_SKZ)[,which(AllLambdas == Lam)]*matchGSA$rev)
 PGS_estime_SKZ <- pgs(GSA, weights=scaled.beta_estime_SKZ)

@@ -12,18 +12,18 @@ library(doParallel)
 setwd(".../RealData")
 
 #---- MAF control ----
-#We keep the SNPs where the minor allele frequency is higher than 10% for european subject in our 
-#CARTaGENE reference data (not available publicly)
+#We keep the SNPs where the minor allele frequency is higher than 10% when calculated among European subject 
+#in our 1000 Genomes reference data.
 sujetsRef <- data.table::fread("all_chrs_with_cms4.fam")
 ancestry <- data.table::fread("igsr_samples.tsv")
 out <- ancestry[which(ancestry$`Sample name` %in% sujetsRef$V1 & ancestry$`Superpopulation code` == "EUR"), c("Sample name")]
 out$V2 <- out[,1]
 data.table::fwrite(data.table::data.table(out), "/Data/sujetsEUR.txt", col.names = FALSE, sep = "\t", row.names = FALSE)
-#Control for MAF<0.1, 3 639 921 SNPs remaining.
+#Control for MAF<0.1. 3 639 921 SNPs remaining.
 system(".../plink --bfile .../all_chrs_with_cms4 --extract .../Data/communMarkerRef.txt --keep .../Data/sujetsEUR.txt --maf 0.1 --make-bed --out .../Data/methodRef")
 
 #---- Pseudo summary statistics ----
-#Reference panel (CARTaGENE)
+#Reference panel (1000 Genome)
 ref.bfile <- "Data/methodRef"
 Xr <- bigsnpr::bed(paste0(ref.bfile,".bed"))
 
@@ -35,7 +35,7 @@ omnibim <- data.table::fread(paste0(Omni, ".bim"))
 GSA <- "Data/methodGSA"
 GSAbim <- data.table::fread(paste0(GSA, ".bim"))
 
-#Sumstats
+#Summary statistics
 #SKZ
 ss_SKZ <- fread('PGC3_SCZ_wave3_public.v2.tsv',fill = TRUE)
 size_SKZ <- sum(94015, 67390)
@@ -47,14 +47,14 @@ names(ss_BIP)[names(ss_BIP) == '#CHROM'] <- "CHR"
 size_BIP <- sum(371549,41917)
 ss_BIP$CHR <- as.numeric(ss_BIP$CHR)
 
-#Matching of the sumstats SKZ and BIP (number of common SNPs = 7 540 573)
+#Matching of the sumstats SKZ and BIP (number of SNPs in common = 7 540 573)
 matchSS <- lassosum:::matchpos(tomatch = ss_SKZ, ref.df = ss_BIP, auto.detect.tomatch = F, auto.detect.ref = F,
   chr = "CHR", ref.chr = "CHR", pos = "BP", ref.pos = "POS", ref = "A1", ref.ref = "A1", alt = "A2", ref.alt = "A2",
   exclude.ambiguous = F, silent = F, rm.duplicates = F)
 ss_SKZ <- ss_SKZ[matchSS$order,]
 ss_BIP <- ss_BIP[matchSS$ref.extract,]
 
-#Matching of the OmniExpress data set with the sumstats (ss_BIP and ss_SKZ are already in the same order) (number of common SNPs = 6 398 846)
+#Matching of the OmniExpress data set with the sumstats (ss_BIP and ss_SKZ are already in the same order) (number of SNPs in common = 6 398 846)
 matchTest <- lassosum:::matchpos(tomatch = omnibim, ref.df = ss_BIP, auto.detect.tomatch = F, auto.detect.ref = F,
   chr = "V1", ref.chr = "CHR", pos = "V4", ref.pos = "POS", ref = "V5", ref.ref = "A1", alt = "V6", ref.alt = "A2",
   exclude.ambiguous = F, silent = F, rm.duplicates = F)
@@ -62,7 +62,7 @@ testOrder <- matchTest$order
 ss_BIP <- ss_BIP[matchTest$ref.extract,]
 ss_SKZ <- ss_SKZ[matchTest$ref.extract,]
 
-#Matching of the GSA data set with the sumstats (ss_BIP, ss_SKZ, OmniExpress data set are already in the same order) (number of common SNPs = 6 398 846)
+#Matching of the GSA data set with the sumstats (ss_BIP, ss_SKZ, OmniExpress data set are already in the same order) (number of SNPs in common = 6 398 846)
 matchTestGSA <- lassosum:::matchpos(tomatch = GSAbim, ref.df = ss_BIP, auto.detect.tomatch = F, auto.detect.ref = F,
   chr = "V1", ref.chr = "CHR", pos = "V4", ref.pos = "POS", ref = "V5", ref.ref = "A1", alt = "V6", ref.alt = "A2",
   exclude.ambiguous = F, silent = F, rm.duplicates = F)
@@ -71,7 +71,7 @@ ss_BIP <- ss_BIP[matchTestGSA$ref.extract,]
 ss_SKZ <- ss_SKZ[matchTestGSA$ref.extract,]
 testOrder <- testOrder[matchTestGSA$ref.extract]
 
-#Matching of the reference data set with the sumstats (ss_BIP, ss_SKZ, OmniExpress and GSA data are already in the same order) (number of common SNPs = 3 639 921)
+#Matching of the reference data set with the sumstats (ss_BIP, ss_SKZ, OmniExpress and GSA data are already in the same order) (number of SNPs in common = 3 639 921)
 matchXr <- lassosum:::matchpos(tomatch = Xr$map, ref.df = ss_BIP, auto.detect.tomatch = F, auto.detect.ref = F,
   chr = "chromosome", ref.chr = "CHR", pos = "physical.pos", ref.pos = "POS", ref = "allele1", ref.ref = "A1", alt = "allele2", ref.alt = "A2",
   exclude.ambiguous = F, silent = F, rm.duplicates = F)
@@ -129,12 +129,13 @@ rB_BIP <- (1/nB)*(n_BIP*r_BIP - nA_BIP*rA_BIP)
 ssA_BIP <- ss_BIP 
 ssB_BIP <- ss_BIP 
 
-#From correlation to p-values.
+#From correlations to p-values.
 cor2p <- function(cor,  n){
 	Q <- (abs(cor)*sqrt(n-2))/(sqrt(1-abs(cor)^2))
 	pval <- pt(q = Q, df = n-2, lower.tail = F)
 	return(pval*2)
 }
+
 #Reformating the sumstats data. It's easier when they are all in the same format.
 ssA_SKZ$Cor <- rA_SKZ
 ssB_SKZ$Cor <- rB_SKZ
@@ -161,9 +162,11 @@ ss_BIP <- dplyr::select(ss_BIP, -DIRE, -NGT, -IMPINFO, - NEFFDIV2)
 ssA_BIP <- dplyr::select(ssA_BIP, -DIRE, -NGT, -IMPINFO, - NEFFDIV2) 
 ssB_BIP <- dplyr::select(ssB_BIP, -DIRE, -NGT, -IMPINFO, - NEFFDIV2) 
 
-#Exportation of the sumstats where only the common SNPs are found and of the new pseudo sumstats.
+#Exportation of the sumstats where only the SNPs in common are found.
 data.table::fwrite(ss_SKZ, "Data/ss_SKZ.txt")
 data.table::fwrite(ss_BIP, "Data/ss_BIP.txt")
+
+#Exporattion of the new pseudo sumstats.
 data.table::fwrite(ssA_SKZ, "Data/ssA_SKZ.txt")
 data.table::fwrite(ssA_BIP, "Data/ssA_BIP.txt")
 data.table::fwrite(ssB_SKZ, "Data/ssB_SKZ.txt")
@@ -171,7 +174,7 @@ data.table::fwrite(ssB_BIP, "Data/ssB_BIP.txt")
 XrMap <- Xr$map[XrOrder,]
 data.table::fwrite(data.table::data.table(XrMap$marker.ID), "Data/communMarkerRef.txt", col.names = FALSE)
 
-#Keep these SNPs only in the test data bfiles.
+#Only keep these SNPs in common in the test data bfiles.
 GSAbim <- GSAbim[testOrderGSA,]
 omnibim <- omnibim[testOrder,]
 data.table::fwrite(data.table::data.table(omnibim$V2), "Data/communMarkerOmni.txt", col.names = FALSE, row.names = FALSE)
@@ -181,7 +184,6 @@ system("/mnt-biostats/Plink/plink --bfile .../Data/methodGSA --extract .../Data/
 
 #---- S-LDXR format ----
 #Trait 1 (Schizophrenia)
-ssA_SKZ$BETA <- log(ssA_SKZ$OR)
 ssA_SKZ <- ssA_SKZ[,c("SNP", "CHR", "BP", "A1", "A2", "Cor", "P", "Nco", "Nca")]
 ssA_SKZ$N <- rowSums(ssA_SKZ[,c("Nco", "Nca")])
 ssA_SKZ$Z <- sign(ssA_SKZ$Cor)*abs(qnorm(p=(ssA_SKZ$P)/2))
@@ -194,7 +196,7 @@ ssA_BIP$Z <- sign(ssA_BIP$Cor)*abs(qnorm(p=(ssA_BIP$PVAL)/2))
 ssA_BIP <- ssA_BIP[,c("ID", "CHR", "POS", "A1", "A2", "Z", "N")]
 colnames(ssA_BIP) <- c("SNP", "CHR", "BP", "A1", "A2", "Z", "N")
 ssA_BIP <- ssA_BIP[order(ssA_BIP$CHR, ssA_BIP$BP),]
-#Export the data
+#Exportation the data
 data.table::fwrite(ssA_SKZ, "S-LDXR/ssA_SKZ_SLDXR.txt", col.names = TRUE, sep = "\t", row.names = FALSE)
 data.table::fwrite(ssA_BIP, "S-LDXR/ssA_BIP_SLDXR.txt", col.names = TRUE, sep = "\t", row.names = FALSE)
 system("gzip S-LDXR/ssA_SKZ_SLDXR.txt")
@@ -202,14 +204,15 @@ system("gzip S-LDXR/ssA_BIP_SLDXR.txt")
 
 #Run S-LDXR following this code:
 #RealData.sh
-#once it is done, continue following this code.
+#Once it is done, continue following the present code.
 
 #---- Heritabilities and covariance estimates ----
 #Import S-LDXR output.
 estimates <- fread("S-LDXR/out-ssA-SKZ-BIP.txt")
-#We want the continuous annotations first, then the binary ones.estimates <- estimates[c(54,55,56,57,59,61,62,60, 1:53,58),]
-SKZ <- fread("S-LDXR/ssA_BIP_SLDXR.txt", select = c("SNP", "BP", "CHR", "A1", "A2"))
-BIP <- fread("S-LDXR/ssA_SKZ_SLDXR.txt", select = c("SNP", "BP", "CHR", "A1", "A2"))
+#We want the continuous annotations first, then the binary ones.
+estimates <- estimates[c(54,55,56,57,59,61,62,60, 1:53,58),]
+SKZ <- fread("S-LDXR/ssA_SKZ_SLDXR.txt", select = c("SNP", "BP", "CHR", "A1", "A2"))
+BIP <- fread("S-LDXR/ssA_BIP_SLDXR.txt", select = c("SNP", "BP", "CHR", "A1", "A2"))
 data <- setNames(SKZ, c("SNP", "POS", "CHR", "A1", "A2"))
 
 #For every chromosome, we initialize an output by trait
@@ -219,7 +222,7 @@ for(i in 1:22){
   print(paste0("Traitement du chromosome ", i, " en cours"))
   data_i <- data[data$CHR == i,]
   comp_i <- data_i
-  #Import the annotations of this chromosome
+  #Import the annotations of this chromosome.
   annotations <- fread(paste0("/home/jricard/Projet_Meriem/S-LDXR/annotations/baseline-LD-X.", i, ".annot.gz")) %>% as.data.frame()
   annotations <- distinct(annotations)
   #Be sure that the annotations are in the same order as they are in the files where thetas are estimated.
@@ -269,7 +272,7 @@ for(i in 1:22){
   #We keep every annotations, continuous and binary ones.
   annotations_i <- annotations_i[, 5:66]
   estimates_i <- estimates[, c("ANNOT", "TAU2", "TAU1", "THETA")]
-  #we compute heritabilities.
+  #Ee compute heritabilities.
   h_SKZ_i <- as.matrix(annotations_i) %*% as.matrix(estimates_i$TAU2)
   h_BIP_i <- as.matrix(annotations_i) %*% as.matrix(estimates_i$TAU1)
   h_trans_i <- as.matrix(annotations_i) %*% as.matrix(estimates_i$THETA)
@@ -284,22 +287,22 @@ h <- h[match(data$SNP, h$SNP),]
 saveRDS(h, "S-LDXR/h_rho_bysnp.RDS")
 
 #---- Methods ----
-#Jeu de reference
+#Test data OmniExpress.
 omni <- "/home/jricard/Projet_Meriem/DonneesReellesMAF/Data/methodOmni"
 omnibim <- data.table::fread(paste0(Omni, ".bim"))
 omnifam <- data.table::fread(paste0(Omni, ".fam"))
 
-#Jeu de test Omni
+#Test data GSA.
 GSA <- "/home/jricard/Projet_Meriem/DonneesReellesMAF/Data/methodGSA"
 GSAbim <- data.table::fread(paste0(GSA, ".bim"))
 
-#Sumstats SKZ
+#Sumstats SKZ.
 corA_SKZ <- ssA_SKZ$Cor
 corB_SKZ <- ssB_SKZ$Cor
 size_SKZ <- sum(94015, 67390)
 ss_SKZ <- ss_SKZ[ss_SKZ$SNP %in% ssA_SKZ$SNP]
 
-#Sumstats BIP
+#Sumstats BIP.
 corA_BIP <- ssA_BIP$Cor
 corB_BIP <- ssB_BIP$Cor
 size_BIP <- sum(371549, 41917)
@@ -307,7 +310,7 @@ ss_BIP <- ss_BIP[ss_BIP$ID %in% ssA_BIP$ID]
 
 #Just to validate that sumstats are in the same order as the OmniExpress and GSA test data sets.
 #If not, be sure that every data sets are in the same SNPs order before using the methods.
-#Matching objects with then be used to reverse effect size if alleles are inversed.
+#Objects that result from lassosum:::matchpos will then be used to reverse effect size if alleles are reversed between sets.
 matchGSA_SKZ <- lassosum:::matchpos(tomatch = ss_SKZ, ref.df = GSAbim, auto.detect.tomatch = F, auto.detect.ref = F,
   chr = "CHR", ref.chr = "V1", pos = "BP", ref.pos = "V4", ref = "A1", ref.ref = "V5", alt = "A2", ref.alt = "V6",
   exclude.ambiguous = F, silent = F, rm.duplicates = F)
@@ -321,15 +324,7 @@ matchOmni_BIP <- lassosum:::matchpos(tomatch = ss_BIP, ref.df = omnibim, auto.de
   chr = "CHR", ref.chr = "V1", pos = "POS", ref.pos = "V4", ref = "A1", ref.ref = "V5", alt = "A2", ref.alt = "V6",
   exclude.ambiguous = F, silent = F, rm.duplicates = F)
 
-#Weights and other objects
-ncores <- detectCores()
-Var.phenotypic <- c(1,1)
-h_obs_ZK <- 0.47
-h_obs_BIP <- 0.45
-Var_genetique_SKZ <- h_obs_ZK
-Var_genetique_BIP <- h_obs_BIP
-Correlation <- 0.59
-Covariance <- Correlation * sqrt(Var_genetique_SKZ) * sqrt(Var_genetique_BIP)
+#Weights and LD blocks.
 LDblocks <- "EUR.hg19" 
 sdOmni <- lassosum:::sd.bfile(bfile = omni)
 weightOmni <- 1/sdOmni
@@ -338,13 +333,13 @@ sdGSA <- lassosum:::sd.bfile(bfile = GSA)
 weightGSA <- 1/sdGSA 
 weightGSA[!is.finite(weightGSA)] <- 0
 
-#heritabilities and covariances
-#As mentionned in the paper, to avoid numeric problems, we fixe negatives and little estimates to 1e-9.
+#Heritabilities and covariances.
+#As mentionned in the paper, to avoid numeric problems, we fix negative and little estimates to 1e-9.
 heritabilite <- readRDS("/S-LDXR/h_rho_bysnp.RDS")
 heritabilite$h_SKZ[heritabilite$h_SKZ < 1e-9] <- 1e-9
 heritabilite$h_BIP[heritabilite$h_BIP < 1e-9] <- 1e-9
 
-#Let's validate the order of the heritabilities estimates.
+#Let's validate the order of the heritability estimates.
 #We use ssA_BIP as a reference, but ssA_SKZ, GSAbim or omnibim could be used as the SNPs order is the same.
 matchHeritabilite <- lassosum:::matchpos(tomatch = heritabilite, ref.df = ssA_BIP, auto.detect.tomatch = F, auto.detect.ref = F,
   					chr = "CHR", ref.chr = "CHR", pos = "BP", ref.pos = "POS",
@@ -419,7 +414,7 @@ saveRDS(PRSthresholdOmniSKZ, file = "Results/ThresholdingOmniSKZ.RDS")
 saveRDS(PRSthresholdOmniBIP, file = "Results/ThresholdingOmniBIP.RDS")
 
 
-#---- MultiLassosum STANDARD ----
+#---- multivariateLassosum STANDARD ----
 cl<-makeCluster(ncores[1]-5)
 AllLambdas <- exp(seq(from = log(1e-2), to = log(2500), length.out = 20))
 outMulti <- lassosum.pipeline(cor = list(corA_SKZ,corA_BIP),
@@ -453,7 +448,7 @@ names(xMulti) <- paste0("lamdba_", AllLambdas)
 maxMulti <- which.max(xMulti)
 saveRDS(xMulti, file = "Results/multiFlambda.RDS")
 
-#Always check the order of the SNPs and the order of the alleles in the object resulting from the method
+#Always check the order of the SNPs and the order of the alleles in the object resulting from the method. Everything should be good.
 omni$V1 <- as.factor(omni$V1)
 matchOmni <- lassosum:::matchpos(tomatch = outMulti$sumstats[[1]], ref.df = omni, auto.detect.tomatch = F, auto.detect.ref = F,
   chr = "chr", ref.chr = "V1", pos = "pos", ref.pos = "V4", ref = "A1", ref.ref = "V5", alt = "A2", ref.alt = "V6",
@@ -465,6 +460,7 @@ matchGSA <- lassosum:::matchpos(tomatch = outMulti$sumstats[[1]], ref.df = GSA, 
 
 
 #PRS (OmniExpress data set)
+#Reverse alleles if necessary
 Lam <- AllLambdas[maxMulti]
 # SKZ
 scaled.beta_estime_SKZ <- as.matrix(Diagonal(x=weightOmni) %*% (mat_Beta_SKZ[,which(AllLambdas == Lam)]*matchOmni$rev))
@@ -476,6 +472,7 @@ PGS_estime_BIP <- pgs(omni, weights=scaled.beta_estime_BIP)
 saveRDS(PGS_estime_BIP, file = paste0("Results/multiOmniBIP_", Lam, ".RDS"))
 
 #PRS (GSA data set)
+#Reverse alleles if necessary
 # SKZ
 scaled.beta_estime_SKZ <- as.matrix(Diagonal(x=weightGSA) %*% (mat_Beta_SKZ[,which(AllLambdas == Lam)]*matchGSA$rev))
 PGS_estime_SKZ <- pgs(GSA, weights=scaled.beta_estime_SKZ)
@@ -517,7 +514,7 @@ names(xMultiGenCov) <- paste0("lamdba_", AllLambdas)
 maxMultiGenCov <- which.max(xMultiGenCov)
 saveRDS(xMultiGenCov, file = paste0("Results/multiGenCovFlambda.RDS"))
 
-#Always check the order of the SNPs and the order of the alleles in the object resulting from the method
+#Always check the order of the SNPs and the order of the alleles in the object resulting from the method. Everything should be good.
 matchOmni <- lassosum:::matchpos(tomatch = outMultiGenCov$sumstats[[1]], ref.df = omni, auto.detect.tomatch = F, auto.detect.ref = F,
   chr = "chr", ref.chr = "V1", pos = "pos", ref.pos = "V4", ref = "A1", ref.ref = "V5", alt = "A2", ref.alt = "V6",
   exclude.ambiguous = F, silent = F, rm.duplicates = F)
@@ -526,6 +523,7 @@ matchGSA <- lassosum:::matchpos(tomatch = outMultiGenCov$sumstats[[1]], ref.df =
   exclude.ambiguous = F, silent = F, rm.duplicates = F)
 
 #PRS (OmniExpress data set)
+#Reverse alleles if necessary
 Lam <- AllLambdas[maxMultiGenCov]
 # SKZ
 scaled.beta_estime_SKZ <- as.matrix(Diagonal(x=weightOmni) %*% (mat_Beta_SKZ[,which(AllLambdas == Lam)]*matchOmni$rev))
@@ -537,6 +535,7 @@ PGS_estime_BIP <- pgs(omni, weights=scaled.beta_estime_BIP)
 saveRDS(PGS_estime_BIP, file = paste0("Results/multiGenCovOmniBIP_", Lam, ".RDS"))
 
 #PRS (GSA data set)
+#Reverse alleles if necessary
 # SKZ
 scaled.beta_estime_SKZ <- as.matrix(Diagonal(x=weightGSA) %*% (mat_Beta_SKZ[,which(AllLambdas == Lam)]*matchGSA$rev))
 PGS_estime_SKZ <- pgs(GSA, weights=scaled.beta_estime_SKZ)
@@ -576,7 +575,7 @@ names(xOGSKZ) <- as.character(AllLambdas)
 maxOGSKZ <- which.max(xOGSKZ)
 saveRDS(xOGSKZ, file = "Results/OGSKZFlambda.RDS")
 
-#Always check the order of the SNPs and the order of the alleles in the object resulting from the method
+#Always check the order of the SNPs and the order of the alleles in the object resulting from the method. Everything should be good.
 matchOmniSKZ <- lassosum:::matchpos(tomatch = OGSKZ$sumstats, ref.df = omni, auto.detect.tomatch = F, auto.detect.ref = F,
   chr = "chr", ref.chr = "V1", pos = "pos", ref.pos = "V4", ref = "A1", ref.ref = "V5", alt = "A2", ref.alt = "V6",
   exclude.ambiguous = F, silent = F, rm.duplicates = F)
@@ -594,7 +593,7 @@ names(xOGBIP) <- as.character(AllLambdas)
 maxOGBIP <- which.max(xOGBIP)
 saveRDS(xOGBIP, file = "Results/OGBIPFlambda.RDS")
   
-#Always check the order of the SNPs and the order of the alleles in the object resulting from the method
+#Always check the order of the SNPs and the order of the alleles in the object resulting from the method. Everything should be good.
 matchOmniBIP <- lassosum:::matchpos(tomatch = OGBIP$sumstats, ref.df = omni, auto.detect.tomatch = F, auto.detect.ref = F,
   chr = "chr", ref.chr = "V1", pos = "pos", ref.pos = "V4", ref = "A1", ref.ref = "V5", alt = "A2", ref.alt = "V6",
   exclude.ambiguous = F, silent = F, rm.duplicates = F)
@@ -603,6 +602,7 @@ matchGSABIP <- lassosum:::matchpos(tomatch = OGBIP$sumstats, ref.df = GSA, auto.
   exclude.ambiguous = F, silent = F, rm.duplicates = F)
 
 #PRS (OmniExpress data set)
+#Reverse alleles if necessary
 # SKZ
 Lam <- AllLambdas[maxOGSKZ]
 scaled.beta_estime_SKZ <- as.matrix(Diagonal(x=weightOmni) %*% (BETA_SKZ[[1]][,which(AllLambdas == Lam)]*matchOmniSKZ$rev))
@@ -615,6 +615,7 @@ PGS_estime_BIP <- pgs(omni, weights=scaled.beta_estime_BIP)
 saveRDS(PGS_estime_BIP, file = paste0("Results/OGOmniBIP_", Lam, ".RDS"))
 
 #PRS (GSA data set)
+#Reverse alleles if necessary
 # SKZ
 Lam <- AllLambdas[maxOGSKZ]
 scaled.beta_estime_SKZ <- as.matrix(Diagonal(x=weightGSA) %*% (BETA_SKZ[[1]][,which(AllLambdas == Lam)]*matchGSASKZ$rev))
@@ -666,10 +667,11 @@ info_snpBIP <- snp_match(ss_BIPCT, map)
 lpSBIP <- -log10(info_snpBIP$p)
 
 #Clumping
+#Thresholds are fixed using Trubetskoy (2022) and Mullins (2021) recommendations for, respectively, SZ and BP.
 ind.keepSKZ <- snp_clumping(GOmni, infos.chr = info_snpSKZ$chr, S = info_snpSKZ$p, thr.r2 = 0.5, size = 250, infos.pos = info_snpSKZ$pos, ncores = NCORES)
 ind.keepBIP <- snp_clumping(GOmni, infos.chr = info_snpBIP$chr, S = info_snpBIP$p, thr.r2 = 0.5, size = 250, infos.pos = info_snpBIP$pos, ncores = NCORES)
 
-#Always check the order of the SNPs and the order of the alleles in the object resulting from the method
+#Always check the order of the SNPs and the order of the alleles in the object resulting from the method. Everything should be good.
 matchGSA <- lassosum:::matchpos(tomatch = obj.bigSNPGSA$map, ref.df = obj.bigSNPOmni$map, auto.detect.tomatch = F, auto.detect.ref = F,
   chr = "chromosome", ref.chr = "chromosome", pos = "physical.pos", ref.pos = "physical.pos", ref = "allele1", ref.ref = "allele1", alt = "allele2", ref.alt = "allele2",
   exclude.ambiguous = F, silent = F, rm.duplicates = F)
@@ -679,15 +681,16 @@ matchGSA <- lassosum:::matchpos(tomatch = obj.bigSNPGSA$map, ref.df = obj.bigSNP
 prs <- snp_PRS(GOmni, betas.keep = info_snpSKZ$beta[ind.keepSKZ], ind.keep = ind.keepSKZ, lpS.keep = lpSSKZ[ind.keepSKZ], thr.list = -log10(0.05))
 saveRDS(prs, file = paste0("Results/CTOmniSKZ.RDS"))
 #BIP
-prs <- snp_PRS(GOmni, betas.keep = info_snpBIP$beta[ind.keepBIP], ind.keep = ind.keepBIP, lpS.keep = lpSBIP[ind.keepBIP], thr.list = -log10(0.2))
+prs <- snp_PRS(GOmni, betas.keep = info_snpBIP$beta[ind.keepBIP], ind.keep = ind.keepBIP, lpS.keep = lpSBIP[ind.keepBIP], thr.list = -log10(0.1))
 saveRDS(prs, file = paste0("Results/CTOmniBIP.RDS"))
 
 # PRS (GSA data set)
+#Reverse alleles if necessary
 #SKZ
 prs <- snp_PRS(GGSA, betas.keep = info_snpSKZ$beta[ind.keepSKZ], ind.keep = ind.keepSKZ, lpS.keep = lpSSKZ[ind.keepSKZ], thr.list = -log10(0.05), same.keep = revGSA[ind.keepSKZ])
 saveRDS(prs, file = paste0("Results/CTGSASKZ.RDS"))
 #BIP
-prs <- snp_PRS(GGSA, betas.keep = info_snpBIP$beta[ind.keepBIP], ind.keep = ind.keepBIP, lpS.keep = lpSBIP[ind.keepBIP], thr.list = -log10(0.2), same.keep = revGSA[ind.keepBIP])
+prs <- snp_PRS(GGSA, betas.keep = info_snpBIP$beta[ind.keepBIP], ind.keep = ind.keepBIP, lpS.keep = lpSBIP[ind.keepBIP], thr.list = -log10(0.1), same.keep = revGSA[ind.keepBIP])
 saveRDS(prs, file = paste0("Results/CTGSABIP.RDS"))
 
 #---- LDPRED2 ----
@@ -709,7 +712,7 @@ colnames(ss_BIP) <- c("rsid", "chr", "pos", "a1", "a0", "beta", "beta_se", "p")
 ss_BIP$n_eff <- 4 / (1 / size_BIP[2] + 1 / size_BIP[1])
 df_beta_BIP <- snp_match(ss_BIP, mapOmni)
 
-#Always check the order of the SNPs and the order of the alleles in the object resulting from the method
+#Always check the order of the SNPs and the order of the alleles in the object resulting from the method. Everything should be good.
 matchOmniSKZ <- lassosum:::matchpos(tomatch = obj.bigSNPOmni$map, ref.df = df_beta_SKZ, auto.detect.tomatch = F, auto.detect.ref = F,
   chr = "chromosome", ref.chr = "chr", pos = "physical.pos", ref.pos = "pos", ref = "allele2", ref.ref = "a0", alt = "allele1", ref.alt = "a1",
   exclude.ambiguous = F, silent = F, rm.duplicates = F)
@@ -735,6 +738,7 @@ beta_auto_SKZ <- sapply(multi_auto_SKZ, function(auto) auto$beta_est)
 beta_auto_SKZ_sparse <- sapply(multi_auto_SKZ, function(auto) auto$beta_est_sparse)
 
 #PRS (OmniExpress data set)
+#Reverse alleles if necessary
 pred_auto_SKZ <- big_prodMat(GOmni, beta_auto_SKZ_sparse*matchOmniSKZ$rev)
 sc <- apply(pred_auto_SKZ, 2, sd)
 keep <- abs(sc - median(sc,na.rm = T)) < 3 * mad(sc,na.rm = T)
@@ -744,6 +748,7 @@ final_pred_auto_SKZ <- big_prodVec(GOmni, Beta_SKZ_LDpred2)
 saveRDS(final_pred_auto_SKZ, file = paste0("Results/LDpred2OmniSKZ.Rdata"))
  
 #PRS (GSA data set)
+#Reverse alleles if necessary
 pred_auto_SKZ <- big_prodMat(GGSA, beta_auto_SKZ_sparse*matchGSASKZ$rev)
 sc <- apply(pred_auto_SKZ, 2, sd)
 keep <- abs(sc - median(sc,na.rm = T)) < 3 * mad(sc,na.rm = T)
@@ -764,6 +769,7 @@ beta_auto_BIP <- sapply(multi_auto_BIP, function(auto) auto$beta_est)
 beta_auto_BIP_sparse <- sapply(multi_auto_BIP, function(auto) auto$beta_est_sparse)
  
 #PRS (OmniExpress data set)
+#Reverse alleles if necessary
 pred_auto_BIP <- big_prodMat(GOmni, beta_auto_BIP_sparse*matchOmniBIP$rev)
 sc <- apply(pred_auto_BIP, 2, sd)
 keep <- abs(sc - median(sc,na.rm = T)) < 3 * mad(sc,na.rm = T)
@@ -773,6 +779,7 @@ final_pred_auto_BIP <- big_prodVec(GOmni, Beta_BIP_LDpred2)
 saveRDS(final_pred_auto_BIP, file = paste0("Results/LDpred2OmniBIP.Rdata")) 
 
 #PRS (GSA data set)
+#Reverse alleles if necessary
 pred_auto_BIP <- big_prodMat(GGSA, beta_auto_BIP_sparse*matchGSABIP$rev)
 sc <- apply(pred_auto_BIP, 2, sd)
 keep <- abs(sc - median(sc,na.rm = T)) < 3 * mad(sc,na.rm = T)
@@ -780,100 +787,3 @@ keep[which(is.na(keep))]<-FALSE
 Beta_BIP_LDpred2 <- rowMeans(as.data.frame(beta_auto_BIP_sparse*matchGSABIP$rev)[, keep])
 final_pred_auto_BIP <- big_prodVec(GGSA, Beta_BIP_LDpred2)
 saveRDS(final_pred_auto_BIP, file = paste0("Results/LDpred2GSABIP.Rdata")) 
-
-#---- PANPRS ----
-Zmatrix <- matrix(c(sign(ssA_SKZ$Cor)*abs(qnorm(p=(ssA_SKZ$P)/2)), sign(ssA_BIP$Cor)*abs(qnorm(p=(ssA_BIP$PVAL)/2))), ncol = 2)
-row.names(Zmatrix) <- omni$V2[matchOmni$order]
-
-#Compute LDscore using PLINK in the method reference bfiles, OmniExpress.
-system(paste0(".../plink --bfile ", omni, " --r2 --ld-window-kb 250 --out .../Data/PANPRSLD-RefOmni"))
-plinkLDgenome <- fread("Data/PANPRSLD-RefOmni.ld")
-colnames(plinkLDgenome) <- c("CHR_A", "BP_A",  "SNP_A", "CHR_B", "BP_B",  "SNP_B", "R")
-#generate the set of tuning parameters on a modified version of gsPEN which doesn't fit the model, but only outputs the tuning matrix.
-initialTuning <- SummaryLasso::gsPEN(summaryZ = Zmatrix, Nvec = c(size_SKZ, size_BIP), plinkLD = plinkLDgenome, numChrs = 2, fit = FALSE) 
-
-for(chr in 1:22){
-  system(paste0(".../plink --bfile ", omni, " --chr ", chr , " --r2 --ld-window-kb 250 --out .../Data/PANPRSLD-RefOmni-chr", chr"))
-  plinkLD <- data.table::fread(paste0(".../Data/PANPRSLD-RefOmni-chr", chr, ".ld"))
-  colnames(plinkLD) <- c("CHR_A", "BP_A",  "SNP_A", "CHR_B", "BP_B",  "SNP_B", "R")
-  plinkLD <- as.data.frame(plinkLD)
-  ZmatrixChr <- Zmatrix[ssA_SKZ$CHR == chr,]
-  PANPRS64chr <- PANPRS64::gsPEN(summaryZ = ZmatrixChr, Nvec = c(size_SKZ, size_BIP), plinkLD = plinkLD, NumIter = 1000, breaking = 1, 
-    numChrs = 1, ChrIndexBeta = 0, Init_summaryBetas = 0, Zscale = 1, 
-    RupperVal = NULL, tuningMatrix = initialTuning, penalty = c("mixLOG"), outputAll = 0, Fit = TRUE)
-  saveRDS(PANPRS64chr, paste0("Results/PANPRS-chr", chr, ".RDS"))
-  tuningChr <- apply(PANPRS64chr$tuningMatrix, 1, FUN = function(x){paste0(round(x,4), collapse = "-")})
-  if(chr==1){
-    PANPRS <- PANPRS64chr
-    PANPRS$Numitervec <- NULL
-    tuning <- tuningChr
-  }else{
-    tuningKeep <- intersect(tuning, tuningChr)
-    tuningCritChr <- which(tuningChr %in% tuningKeep)
-    tuningCrit <- which(tuning %in% tuningKeep)
-    PANPRS$BetaMatrix <- cbind(PANPRS$BetaMatrix[tuningCrit,], PANPRS64chr$BetaMatrix[tuningCritChr,])
-    PANPRS$tuningMatrix <- PANPRS$tuningMatrix[tuningCrit,]
-    tuning <- tuningKeep
-  }
-  saveRDS(PANPRS, paste0("Results/PANPRS.RDS"))
-
-}
-
-#Validation
-whereSKZ <- which(stringr::str_detect(dimnames(PANPRS$BetaMatrix)[[2]], "trait1"))
-orderSKZ <- dimnames(PANPRS$BetaMatrix)[[2]][whereSKZ]
-orderSKZ <- substr(orderSKZ, 1, nchar(orderSKZ)-7)
-whereBIP <- which(stringr::str_detect(dimnames(PANPRS$BetaMatrix)[[2]], "trait2"))
-orderBIP <- dimnames(PANPRS$BetaMatrix)[[2]][whereBIP]
-orderBIP <- substr(orderBIP, 1, nchar(orderBIP)-7)
-NbrLambdas <- dim(PANPRS$tuningMatrix)[1]
-mat_Beta_SKZ <- PANPRS$BetaMatrix[,1:whereSKZ]
-mat_Beta_BIP <- PANPRS$BetaMatrix[,whereBIP]
-BETA <- data.frame()
-for(idx in 1:NbrLambdas){
-  if(idx == 1){
-    BETA <- data.frame(c(rbind(PANPRS$BetaMatrix[1,whereSKZ],rbind(PANPRS$BetaMatrix[1,whereBIP]))))
-  }else{
-    add_idx <- c(rbind(PANPRS$BetaMatrix[idx,whereSKZ],rbind(PANPRS$BetaMatrix[idx,whereBIP])))
-    BETA <- cbind(BETA, add_idx)
-  }
-}
-BETA <- as.matrix(BETA)
-x <- f_lambda(beta_SKZ_lambda = t(mat_Beta_SKZ), beta_BIP_lambda = t(mat_Beta_BIP), r_hat = c(rbind(corB_SKZ, corB_BIP)), sd = sdOmni, beta = BETA)
-names(x) <- apply(PANPRS$tuningMatrix, 1, FUN = function(x){paste0(round(x,4), collapse = "-")})
-AllLambdas <- names(x)
-AllLambdasMax <- names(which.max(x))
-saveRDS(x, "Results/Valeurs_f_lambda_PANPRS.Rdata")
-
-#To validate that the SNPs are in the same order as in the GSA and OmniExpress bfiles.
-#SNPorderPANPRS <- dimnames(PANPRS$BetaMatrix)[[2]][1:nbr_SNP] %>% strsplit(., ".trait", fixed = TRUE) %>% sapply(., head, 1)
-#all(SNPorderPANPRS == omni$V2[matchOmni$order])
-
-#S'assurer du sens des alleles
-#Les betas sont dans le sens des stats recaps SKZ
-matchGSA <- lassosum:::matchpos(tomatch = ss_SKZ, ref.df = GSA, auto.detect.tomatch = F, auto.detect.ref = F,
-  chr = "CHR", ref.chr = "V1", pos = "BP", ref.pos = "V4", ref = "A1", ref.ref = "V5", alt = "A2", ref.alt = "V6",
-  exclude.ambiguous = F, silent = F, rm.duplicates = F)
-matchOmni <- lassosum:::matchpos(tomatch = ss_SKZ, ref.df = omni, auto.detect.tomatch = F, auto.detect.ref = F,
-  chr = "CHR", ref.chr = "V1", pos = "BP", ref.pos = "V4", ref = "A1", ref.ref = "V5", alt = "A2", ref.alt = "V6",
-  exclude.ambiguous = F, silent = F, rm.duplicates = F)
-
-#PRS (OmniExpress data set)
-# SKZ
-scaled.beta_estime_SKZ <- as.matrix(t(mat_Beta_SKZ)[,which(AllLambdas == AllLambdasMax)][matchOmni$order]*matchOmni$rev)
-PGS_estime_SKZ <- pgs(omni, weights=scaled.beta_estime_SKZ)
-saveRDS(PGS_estime_SKZ, file = "Results/PANPRSOmniSKZ.Rdata"))
-# BIP 
-scaled.beta_estime_BIP <- as.matrix(t(mat_Beta_BIP)[,which(AllLambdas == AllLambdasMax)][matchOmni$order]*matchOmni$rev)
-PGS_estime_BIP <- pgs(omni, weights=scaled.beta_estime_BIP)
-saveRDS(PGS_estime_BIP, file = "Results/PANPRSOmniBIP.Rdata")
-
-#PRS (GSA data set)
-# SKZ
-scaled.beta_estime_SKZ <- as.matrix(t(mat_Beta_SKZ)[,which(AllLambdas == AllLambdasMax)][matchGSA$order]*matchGSA$rev)
-PGS_estime_SKZ <- pgs(GSA, weights=scaled.beta_estime_SKZ)
-saveRDS(PGS_estime_SKZ, file = "Results/PANPRSGSASKZ.Rdata")
-# BIP 
-scaled.beta_estime_BIP <- as.matrix(t(mat_Beta_BIP)[,which(AllLambdas == AllLambdasMax)][matchGSA$order]*matchGSA$rev)
-PGS_estime_BIP <- pgs(GSA, weights=scaled.beta_estime_BIP)
-saveRDS(PGS_estime_BIP, file = "Results/PANPRSGSABIP.Rdata")
