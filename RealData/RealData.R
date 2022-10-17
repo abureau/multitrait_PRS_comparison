@@ -211,9 +211,10 @@ system("gzip S-LDXR/ssA_BIP_SLDXR.txt")
 estimates <- fread("S-LDXR/out-ssA-SKZ-BIP.txt")
 #We want the continuous annotations first, then the binary ones.
 estimates <- estimates[c(54,55,56,57,59,61,62,60, 1:53,58),]
-SKZ <- fread("S-LDXR/ssA_SKZ_SLDXR.txt", select = c("SNP", "BP", "CHR", "A1", "A2"))
-BIP <- fread("S-LDXR/ssA_BIP_SLDXR.txt", select = c("SNP", "BP", "CHR", "A1", "A2"))
-data <- setNames(SKZ, c("SNP", "POS", "CHR", "A1", "A2"))
+#Let's generate a dataframe containing the SNP information in the order of our sumstats.
+#SKZ as much as BIP sumstats could be used.
+SNPinfo <- fread("S-LDXR/ssA_SKZ_SLDXR.txt", select = c("SNP", "BP", "CHR", "A1", "A2"))
+data <- setNames(SNPinfo, c("SNP", "POS", "CHR", "A1", "A2"))
 
 #For every chromosome, we initialize an output by trait
 h <- data.frame()
