@@ -110,14 +110,17 @@ for (j in 1:nbr_SNP) {
 #Function
 f_lambda <- function(beta_SKZ_lambda, beta_BIP_lambda, r_hat,sd,keep_sujets,beta){
   bXy <- r_hat %*% beta 
-  weight <- 1/sd
-  weight[!is.finite(weight)] <- 0
-  scaled.beta_SKZ <- as.matrix(Diagonal(x=weight) %*% beta_SKZ_lambda)
-  scaled.beta_BIP <- as.matrix(Diagonal(x=weight) %*% beta_BIP_lambda)
-  pgs_SKZ <- pgs(Data, keep=keep_sujets,
-                 weights=scaled.beta_SKZ)
-  pgs_BIP <- pgs(Data, keep=keep_sujets, 
-                 weights=scaled.beta_BIP)
+  if(!is.null(sd)){
+    weight <- 1/sd
+    weight[!is.finite(weight)] <- 0
+    scaled.beta_SKZ <- as.matrix(Diagonal(x=weight) %*% beta_SKZ_lambda)
+    scaled.beta_BIP <- as.matrix(Diagonal(x=weight) %*% beta_BIP_lambda)
+    pgs_SKZ <- pgs(Data, keep=keep_sujets, weights=scaled.beta_SKZ)
+    pgs_BIP <- pgs(Data, keep=keep_sujets, weights=scaled.beta_BIP)
+  } else{
+    pgs_SKZ <- pgs(Data, keep=keep_sujets, weights=beta_SKZ_lambda)
+    pgs_BIP <- pgs(Data, keep=keep_sujets, weights=beta_BIP_lambda)
+  }
   if(ncol(pgs_SKZ)>1){
     pred <- matrix(data = NA,nrow = 2*nrow(pgs_SKZ),ncol = ncol(pgs_SKZ))
     for(i in 1:ncol(pgs_SKZ)){
@@ -135,7 +138,7 @@ f_lambda <- function(beta_SKZ_lambda, beta_BIP_lambda, r_hat,sd,keep_sujets,beta
 }
 
 #Compute LD matrix using PLINK for PANPRS in the method reference bfiles.
-system(paste0(".../plink --bfile ", Data, " --keep .../keep.2.txt --r2 --ld-window-kb 250 --out .../PANPRSLD"))
+system(paste0(".../plink --bfile ", Data, " --keep .../keep.2.txt --r2 --ld-window-kb 250 --ld-window-r2 0 --out .../PANPRSLD"))
 plinkLDgenome <- data.table::fread(".../PANPRSLD.ld")
 colnames(plinkLDgenome) <- c("CHR_A", "BP_A",  "SNP_A", "CHR_B", "BP_B",  "SNP_B", "R")
 
@@ -463,7 +466,7 @@ for (k in 1:20) {
   initialTuning <- SummaryLasso::gsPEN(summaryZ = Zmatrix, Nvec = c(size_SKZ, size_BIP), plinkLD = plinkLDgenome, numChrs = 22, fit = FALSE)
 
   for(chr in 1:22){
-    system(paste0(".../plink --bfile ", Data, " --chr ", chr ," --keep .../keep.2.txt --r2 --ld-window-kb 250 --out .../Simulation_", k, "/PANPRSLD"))
+    system(paste0(".../plink --bfile ", Data, " --chr ", chr ," --keep .../keep.2.txt --r2 --ld-window-kb 250 --ld-window-r2 0 --out .../Simulation_", k, "/PANPRSLD"))
     plinkLD <- data.table::fread(paste0(".../Simulation_", k, "/PANPRSLD.ld"))
     colnames(plinkLD) <- c("CHR_A", "BP_A",  "SNP_A", "CHR_B", "BP_B",  "SNP_B", "R")
     plinkLD <- as.data.frame(plinkLD)
@@ -509,7 +512,7 @@ for (k in 1:20) {
     }
   }
   BETA <- as.matrix(BETA)
-  x <- f_lambda(beta_SKZ_lambda = t(mat_Beta_SKZ), beta_BIP_lambda = t(mat_Beta_BIP), r_hat = r.2, sd = sd.2, keep_sujets = parsed.2$keep, beta = BETA)
+  x <- f_lambda(beta_SKZ_lambda = t(mat_Beta_SKZ), beta_BIP_lambda = t(mat_Beta_BIP), r_hat = r.2, sd = NULL, keep_sujets = parsed.2$keep, beta = BETA)
   names(x) <- apply(PANPRS$tuningMatrix, 1, FUN = function(x){paste0(round(x,4), collapse = "-")})
   saveRDS(x, file = "PANPRS/Valeurs_f_lambda_PANPRS.Rdata")
   

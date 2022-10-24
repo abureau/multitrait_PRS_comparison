@@ -196,13 +196,7 @@ system(".../plink --bfile .../PANPRS/Data/methodGSA --extract .../PANPRS/Data/ma
 #Test data OmniExpress and GSA
 omni <- "PANPRS/Data/methodOmni"
 omnibim <- data.table::fread(paste0(omni, ".bim"))
-sdOmni <- lassosum:::sd.bfile(bfile = omni)
-weightOmni <- 1/sdOmni
-weightOmni[!is.finite(weightOmni)] <- 0
 GSA <- "PANPRS/Data/methodGSA"
-sdGSA <- lassosum:::sd.bfile(bfile = GSA)
-weightGSA <- 1/sdGSA 
-weightGSA[!is.finite(weightGSA)] <- 0
 
 #Sumstats SKZ
 corA_SKZ <- ssA_SKZ$Cor
@@ -223,25 +217,32 @@ matchOmni <- lassosum:::matchpos(tomatch = omnibim, ref.df = ssA_SKZ, auto.detec
   exclude.ambiguous = F, silent = F, rm.duplicates = F)
 
 #flambda function for validation
-f_lambda <- function(beta_SKZ_lambda, beta_BIP_lambda, r_hat, sd, beta){
+#Function
+f_lambda <- function(beta_SKZ_lambda, beta_BIP_lambda, r_hat,sd,keep_sujets,beta){
   bXy <- r_hat %*% beta 
-  weight <- 1/sd
-  weight[!is.finite(weight)] <- 0
-  scaled.beta_SKZ <- as.matrix(Diagonal(x=weight) %*% beta_SKZ_lambda)
-  scaled.beta_BIP <- as.matrix(Diagonal(x=weight) %*% beta_BIP_lambda)
-  pgs_SKZ <- pgs(bfile = omni, weights=scaled.beta_SKZ)
-  pgs_BIP <- pgs(bfile = omni, weights=scaled.beta_BIP)
-  n <- nrow(omnifam)
+  if(!is.null(sd)){
+    weight <- 1/sd
+    weight[!is.finite(weight)] <- 0
+    scaled.beta_SKZ <- as.matrix(Diagonal(x=weight) %*% beta_SKZ_lambda)
+    scaled.beta_BIP <- as.matrix(Diagonal(x=weight) %*% beta_BIP_lambda)
+    pgs_SKZ <- pgs(Data, keep=keep_sujets, weights=scaled.beta_SKZ)
+    pgs_BIP <- pgs(Data, keep=keep_sujets, weights=scaled.beta_BIP)
+  } else{
+    pgs_SKZ <- pgs(Data, keep=keep_sujets, weights=beta_SKZ_lambda)
+    pgs_BIP <- pgs(Data, keep=keep_sujets, weights=beta_BIP_lambda)
+  }
   if(ncol(pgs_SKZ)>1){
     pred <- matrix(data = NA,nrow = 2*nrow(pgs_SKZ),ncol = ncol(pgs_SKZ))
-    for(i in 1:ncol(pgs_SKZ)){pred[,i] <- c(rbind(pgs_SKZ[,i],pgs_BIP[,i]))}
+    for(i in 1:ncol(pgs_SKZ)){
+      pred[,i] <- c(rbind(pgs_SKZ[,i],pgs_BIP[,i]))
+    }
   }else{
     pgs_SKZ<- as.vector(pgs_SKZ)
     pgs_BIP<- as.vector(pgs_BIP)
     pred <- c(rbind(pgs_SKZ,pgs_BIP))
   }
   pred2 <- scale(pred, scale=F)
-  bXXb <- colSums(pred2^2) / n
+  bXXb <- colSums(pred2^2) / nrow(pgs_SKZ)
   result <- as.vector(bXy / sqrt(bXXb))
   return(result)
 }
@@ -251,14 +252,14 @@ Zmatrix <- matrix(c(sign(ssA_SKZ$Cor)*abs(qnorm(p=(ssA_SKZ$P)/2)), sign(ssA_BIP$
 row.names(Zmatrix) <- omni$V2[matchOmni$order]
 
 #Compute LDscore using PLINK in the method reference bfiles, OmniExpress.
-system(paste0(".../plink --bfile ", omni, " --r2 --ld-window-kb 250 --out .../PANPRS/Data/PANPRSLD-RefOmni"))
+system(paste0(".../plink --bfile ", omni, " --r2 --ld-window-kb 250 --ld-window-r2 0 --out .../PANPRS/Data/PANPRSLD-RefOmni"))
 plinkLDgenome <- fread("PANPRS/Data/PANPRSLD-RefOmni.ld")
 colnames(plinkLDgenome) <- c("CHR_A", "BP_A",  "SNP_A", "CHR_B", "BP_B",  "SNP_B", "R")
 #Generate the set of tuning parameters on a modified version of gsPEN which doesn't fit the model, but only outputs the tuning matrix.
 initialTuning <- SummaryLasso::gsPEN(summaryZ = Zmatrix, Nvec = c(size_SKZ, size_BIP), plinkLD = plinkLDgenome, numChrs = 2, fit = FALSE) 
 
 for(chr in 1:22){
-  system(paste0(".../plink --bfile ", omni, " --chr ", chr , " --r2 --ld-window-kb 250 --out .../PANPRS/Data/PANPRSLD-RefOmni-chr", chr))
+  system(paste0(".../plink --bfile ", omni, " --chr ", chr , " --r2 --ld-window-kb 250 --ld-window-r2 0 --out .../PANPRS/Data/PANPRSLD-RefOmni-chr", chr))
   plinkLD <- data.table::fread(paste0(".../PANPRS/Data/PANPRSLD-RefOmni-chr", chr, ".ld"))
   colnames(plinkLD) <- c("CHR_A", "BP_A",  "SNP_A", "CHR_B", "BP_B",  "SNP_B", "R")
   plinkLD <- as.data.frame(plinkLD)
@@ -311,7 +312,7 @@ for(idx in 1:NbrLambdas){
   }
 }
 BETA <- as.matrix(BETA)
-x <- f_lambda(beta_SKZ_lambda = t(mat_Beta_SKZ), beta_BIP_lambda = t(mat_Beta_BIP), r_hat = c(rbind(corB_SKZ, corB_BIP)), sd = sdOmni, beta = BETA)
+x <- f_lambda(beta_SKZ_lambda = t(mat_Beta_SKZ), beta_BIP_lambda = t(mat_Beta_BIP), r_hat = c(rbind(corB_SKZ, corB_BIP)), sd = NULL, beta = BETA)
 names(x) <- apply(PANPRS$tuningMatrix[DiffZeroCrit,], 1, FUN = function(x){paste0(round(x,4), collapse = "-")})
 saveRDS(x, file = "PANPRS/Results/Valeurs_f_lambda_PANPRS.Rdata")
 
