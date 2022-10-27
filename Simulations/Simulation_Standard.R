@@ -12,6 +12,11 @@ library(bigsnpr)
 library(bigstatsr)
 library(xgboost)
 
+#CARTaGENE data aren't publicly available.
+#This code shows how we generated our simulated data.
+#Objects derived from CARTaGENE data are found here:
+#https://data.mendeley.com/datasets/jxz9jwssf6/1
+
 Data <- ".../Data_Cartagene_imputed"
 parsed <- parseselect(Data,extract = NULL, exclude = NULL,keep = NULL, remove = NULL,chr = NULL)
 nbr_SNP <- parsed$P
@@ -57,6 +62,15 @@ pi2 <- Var_SKZ_beta / sigma2 - pi1
 pi3 <- Var_BIP_beta / sigma2 - pi1
 pi4 <- 1 - pi1 - pi2 - pi3
 prob <- c(pi1, pi2, pi3, pi4)
+sd.1 <- lassosum:::sd.bfile(bfile = Data,keep=keep.1)
+sd.2 <- lassosum:::sd.bfile(bfile = Data,keep=keep.2)
+#Import them both from online 
+#sd.1 <- readRDS("sd.1.RDS")
+#sd.2 <- readRDS("sd.2.RDS")
+Var_Y_SKZ <- 1
+sd_Y_SKZ <- 1
+Var_Y_BIP <- 1
+sd_Y_BIP <- 1
 
 for (k in 1:20){
   print(paste0("Simulation ", k))
@@ -77,22 +91,6 @@ for (k in 1:20){
   Beta_simule_SKZ <- Beta[1, ]
   Beta_simule_BIP <- Beta[2, ]
   saveRDS(Beta, file = "Beta_simules.Rdata")
-
-  #Standardized betas
-  Var_Y_SKZ <- 1
-  sd_Y_SKZ <- 1
-  Var_Y_BIP <- 1
-  sd_Y_BIP <- 1
-  sd.1 <- lassosum:::sd.bfile(bfile = Data,keep=keep.1)
-  Beta0 <- matrix(data = NA, nrow = 2, ncol = nbr_SNP)
-  rownames(Beta0) <- c("SKZ", "BIP")
-  for (j in 1:nbr_SNP) {
-    Beta0[1, j] <- Beta[1, j] * (sd.1[j] / sd_Y_SKZ)
-    Beta0[2, j] <- Beta[2, j] * (sd.1[j] / sd_Y_BIP)
-  }
-  Beta0_simule_SKZ <- Beta0[1, ]
-  Beta0_simule_BIP <- Beta0[2, ]
-  saveRDS(Beta0, file = "Beta0_simules.Rdata")
 
   #Objects to compute the correlation.
   LDblocks <- "EUR.hg19"
@@ -123,6 +121,17 @@ for (k in 1:20){
   cores
   cl <- makeCluster(cores[1]-10)
   registerDoParallel(cl)
+  
+  #Standardized betas in the first data set
+  Beta0 <- matrix(data = NA, nrow = 2, ncol = nbr_SNP)
+  rownames(Beta0) <- c("SKZ", "BIP")
+  for (j in 1:nbr_SNP) {
+    Beta0[1, j] <- Beta[1, j] * (sd.1[j] / sd_Y_SKZ)
+    Beta0[2, j] <- Beta[2, j] * (sd.1[j] / sd_Y_BIP)
+  }
+  Beta0_simule_SKZ <- Beta0[1, ]
+  Beta0_simule_BIP <- Beta0[2, ]
+  saveRDS(Beta0, file = "Beta0_simules.Rdata")
 
   #Correlations in the first data set used as a reference.
   r_SKZ <- c()
@@ -156,7 +165,21 @@ for (k in 1:20){
   r_BIP <- r[2,]  
   saveRDS(r_SKZ, file = "r_SKZ_simules.Rdata")
   saveRDS(r_BIP, file = "r_BIP_simules.Rdata")
+  #Import them both from online 
+  #r_SKZ <- readRDS(paste0("Standard/Simulation_",k , "/r_SKZ_simule.RData"))
+  #r_BIP <- readRDS(paste0("Standard/Simulation_",k , "/r_BIP_simule.RData"))
 
+  #Standardized betas in the second data set
+  Beta0 <- matrix(data = NA, nrow = 2, ncol = nbr_SNP)
+  rownames(Beta0) <- c("SKZ", "BIP")
+  for (j in 1:nbr_SNP) {
+    Beta0[1, j] <- Beta[1, j] * (sd.2[j] / sd_Y_SKZ)
+    Beta0[2, j] <- Beta[2, j] * (sd.2[j] / sd_Y_BIP)
+  }
+  Beta0_simule_SKZ <- Beta0[1, ]
+  Beta0_simule_BIP <- Beta0[2, ]
+  saveRDS(Beta0, file = "Beta0_simules_jeu2.Rdata")
+  
   #Correlations in the second data set used for validation.
   r_SKZ <- c()
   r_BIP <- c()
@@ -189,6 +212,9 @@ for (k in 1:20){
   r_BIP <- r[2,]
   saveRDS(r_SKZ, file = "GenCovNewSim/r_SKZ_simules_jeu2.Rdata")
   saveRDS(r_BIP, file = "GenCovNewSim/r_BIP_simules_jeu2.Rdata")
+  #Import them both from online 
+  #r_SKZ <- readRDS(paste0("Standard/Simulation_",k , "/r_SKZ_simule_jeu2.RData"))
+  #r_BIP <- readRDS(paste0("Standard/Simulation_",k , "/r_BIP_simule_jeu2.RData"))
   stopCluster(cl)
 
   #Simulated PRSs

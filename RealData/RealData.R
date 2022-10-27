@@ -14,7 +14,9 @@ setwd(".../RealData")
 #---- MAF control ----
 #We keep the SNPs where the minor allele frequency is higher than 10% when calculated among European subject 
 #in our 1000 Genomes reference data.
+#
 sujetsRef <- data.table::fread("all_chrs_with_cms4.fam")
+#https://www.internationalgenome.org/data-portal/sample
 ancestry <- data.table::fread("igsr_samples.tsv")
 out <- ancestry[which(ancestry$`Sample name` %in% sujetsRef$V1 & ancestry$`Superpopulation code` == "EUR"), c("Sample name")]
 out$V2 <- out[,1]
@@ -370,30 +372,6 @@ for (j in 1:nbr_SNP) {
   phenotypic.genetic.Var.Cov.matrix[,,j] <- matrix(data = c(bySNP*totalMatrix[1,1], bySNP*totalMatrix[1,2], bySNP*totalMatrix[2,1], bySNP*totalMatrix[2,2]), nrow = 2, ncol = 2)
 }
 
-#flambda function for validation
-f_lambda <- function(beta_SKZ_lambda, beta_BIP_lambda, r_hat, sd, beta){
-  bXy <- r_hat %*% beta 
-  weight <- 1/sd
-  weight[!is.finite(weight)] <- 0
-  scaled.beta_SKZ <- as.matrix(Diagonal(x=weight) %*% beta_SKZ_lambda)
-  scaled.beta_BIP <- as.matrix(Diagonal(x=weight) %*% beta_BIP_lambda)
-  pgs_SKZ <- pgs(bfile = omni, weights=scaled.beta_SKZ)
-  pgs_BIP <- pgs(bfile = omni, weights=scaled.beta_BIP)
-  n <- nrow(omnifam)
-  if(ncol(pgs_SKZ)>1){
-    pred <- matrix(data = NA,nrow = 2*nrow(pgs_SKZ),ncol = ncol(pgs_SKZ))
-    for(i in 1:ncol(pgs_SKZ)){pred[,i] <- c(rbind(pgs_SKZ[,i],pgs_BIP[,i]))}
-  }else{
-    pgs_SKZ<- as.vector(pgs_SKZ)
-    pgs_BIP<- as.vector(pgs_BIP)
-    pred <- c(rbind(pgs_SKZ,pgs_BIP))
-  }
-  pred2 <- scale(pred, scale=F)
-  bXXb <- colSums(pred2^2) / n
-  result <- as.vector(bXy / sqrt(bXXb))
-  return(result)
-}
-
 #---- Thresholding ----
 #Thresholds are fixed using Trubetskoy (2022) and Mullins (2021) recommendations for, respectively, SZ and BP.
 betaSKZ <- log(ss_SKZ$OR)*matchGSA_SKZ$rev
@@ -434,17 +412,8 @@ NbrLambdas <- length(outMulti$lambda)
 NbrTrait <- length(outMulti$sumstats)
 mat_Beta_SKZ <- outMulti$beta[[NbrS]][,seq(from = 1, to = (NbrLambdas*2)-1, by = 2)]
 mat_Beta_BIP <- outMulti$beta[[NbrS]][,seq(from = 2, to = NbrLambdas*2, by = 2)]
-BETA <- data.frame()
-for(idx in 1:NbrLambdas){
-  if(idx == 1){
-    BETA <- data.frame(c(rbind(outMulti$beta[[1]][,1],rbind(outMulti$beta[[1]][,2]))))
-  }else{
-    add_idx <- c(rbind(outMulti$beta[[1]][,(2*idx)-1],rbind(outMulti$beta[[1]][,2*idx])))
-    BETA <- cbind(BETA, add_idx)
-  }
-}
-BETA <- as.matrix(BETA)
-xMulti <- f_lambda(beta_SKZ_lambda = mat_Beta_SKZ, beta_BIP_lambda = mat_Beta_BIP, r_hat = c(rbind(corB_SKZ, corB_BIP)), sd = sdOmni, beta = BETA)
+array_Beta <- array(c(mat_Beta_SKZ, mat_Beta_BIP), dim = c(dim(mat_Beta_SKZ)[1], dim(mat_Beta_SKZ)[2], 2))
+xMulti <- multivariateLassosum::pseudovalidate(r = cbind(corB_SKZ, corB_BIP), sd = sdOmni, beta = array_Beta)
 names(xMulti) <- paste0("lamdba_", AllLambdas)
 maxMulti <- which.max(xMulti)
 saveRDS(xMulti, file = "Results/multiFlambda.RDS")
@@ -500,17 +469,8 @@ saveRDS(outMultiGenCov, file = "Results/multiGenCov.RDS")
 NbrLambdas <- length(outMultiGenCov$lambda)
 mat_Beta_SKZ <- outMultiGenCov$beta[[1]][,seq(from = 1, to = (NbrLambdas*2)-1, by = 2)]
 mat_Beta_BIP <- outMultiGenCov$beta[[1]][,seq(from = 2, to = NbrLambdas*2, by = 2)]
-BETA <- data.frame()
-for(idx in 1:NbrLambdas){
-  if(idx == 1){
-    BETA <- data.frame(c(rbind(outMultiGenCov$beta[[1]][,1],rbind(outMultiGenCov$beta[[1]][,2]))))
-  }else{
-    add_idx <- c(rbind(outMultiGenCov$beta[[1]][,(2*idx)-1],rbind(outMultiGenCov$beta[[1]][,2*idx])))
-    BETA <- cbind(BETA, add_idx)
-  }
-}
-BETA <- as.matrix(BETA)
-xMultiGenCov <- f_lambda(beta_SKZ_lambda = mat_Beta_SKZ, beta_BIP_lambda = mat_Beta_BIP, r_hat = c(rbind(corB_SKZ, corB_BIP)), sd = sdOmni, beta = BETA)
+array_Beta <- array(c(mat_Beta_SKZ, mat_Beta_BIP), dim = c(dim(mat_Beta_SKZ)[1], dim(mat_Beta_SKZ)[2], 2))
+xMultiGenCov <- multivariateLassosum::pseudovalidate(r = cbind(corB_SKZ, corB_BIP), sd = sdOmni, beta = array_Beta)
 names(xMultiGenCov) <- paste0("lamdba_", AllLambdas)
 maxMultiGenCov <- which.max(xMultiGenCov)
 saveRDS(xMultiGenCov, file = paste0("Results/multiGenCovFlambda.RDS"))

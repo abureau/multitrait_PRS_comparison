@@ -216,37 +216,6 @@ matchOmni <- lassosum:::matchpos(tomatch = omnibim, ref.df = ssA_SKZ, auto.detec
   chr = "V1", ref.chr = "CHR", pos = "V4", ref.pos = "BP", ref = "V5", ref.ref = "A1", alt = "V6", ref.alt = "A2",
   exclude.ambiguous = F, silent = F, rm.duplicates = F)
 
-#flambda function for validation
-#Function
-f_lambda <- function(beta_SKZ_lambda, beta_BIP_lambda, r_hat,sd,keep_sujets,beta){
-  bXy <- r_hat %*% beta 
-  if(!is.null(sd)){
-    weight <- 1/sd
-    weight[!is.finite(weight)] <- 0
-    scaled.beta_SKZ <- as.matrix(Diagonal(x=weight) %*% beta_SKZ_lambda)
-    scaled.beta_BIP <- as.matrix(Diagonal(x=weight) %*% beta_BIP_lambda)
-    pgs_SKZ <- pgs(Data, keep=keep_sujets, weights=scaled.beta_SKZ)
-    pgs_BIP <- pgs(Data, keep=keep_sujets, weights=scaled.beta_BIP)
-  } else{
-    pgs_SKZ <- pgs(Data, keep=keep_sujets, weights=beta_SKZ_lambda)
-    pgs_BIP <- pgs(Data, keep=keep_sujets, weights=beta_BIP_lambda)
-  }
-  if(ncol(pgs_SKZ)>1){
-    pred <- matrix(data = NA,nrow = 2*nrow(pgs_SKZ),ncol = ncol(pgs_SKZ))
-    for(i in 1:ncol(pgs_SKZ)){
-      pred[,i] <- c(rbind(pgs_SKZ[,i],pgs_BIP[,i]))
-    }
-  }else{
-    pgs_SKZ<- as.vector(pgs_SKZ)
-    pgs_BIP<- as.vector(pgs_BIP)
-    pred <- c(rbind(pgs_SKZ,pgs_BIP))
-  }
-  pred2 <- scale(pred, scale=F)
-  bXXb <- colSums(pred2^2) / nrow(pgs_SKZ)
-  result <- as.vector(bXy / sqrt(bXXb))
-  return(result)
-}
-
 #PANPRS
 Zmatrix <- matrix(c(sign(ssA_SKZ$Cor)*abs(qnorm(p=(ssA_SKZ$P)/2)), sign(ssA_BIP$Cor)*abs(qnorm(p=(ssA_BIP$PVAL)/2))), ncol = 2)
 row.names(Zmatrix) <- omni$V2[matchOmni$order]
@@ -259,9 +228,7 @@ colnames(plinkLDgenome) <- c("CHR_A", "BP_A",  "SNP_A", "CHR_B", "BP_B",  "SNP_B
 initialTuning <- SummaryLasso::gsPEN(summaryZ = Zmatrix, Nvec = c(size_SKZ, size_BIP), plinkLD = plinkLDgenome, numChrs = 2, fit = FALSE) 
 
 for(chr in 1:22){
-  system(paste0(".../plink --bfile ", omni, " --chr ", chr , " --r2 --ld-window-kb 250 --ld-window-r2 0 --out .../PANPRS/Data/PANPRSLD-RefOmni-chr", chr))
-  plinkLD <- data.table::fread(paste0(".../PANPRS/Data/PANPRSLD-RefOmni-chr", chr, ".ld"))
-  colnames(plinkLD) <- c("CHR_A", "BP_A",  "SNP_A", "CHR_B", "BP_B",  "SNP_B", "R")
+  plinkLD <- plinkLDgenome[plinkLDgenome$CHR_A == chr & plinkLDgenome$CHR_B == chr,]
   plinkLD <- as.data.frame(plinkLD)
   ZmatrixChr <- Zmatrix[ssA_SKZ$CHR == chr,]
   PANPRSchr <- summaryLasso::gsPEN(summaryZ = ZmatrixChr, Nvec = c(size_SKZ, size_BIP), plinkLD = plinkLD, NumIter = 1000, breaking = 1, 
@@ -300,19 +267,8 @@ mat_Beta_BIP <- PANPRS$BetaMatrix[,whereBIP]
 order <- match(omnibim$V2, orderSKZ)
 mat_Beta_SKZ <- mat_Beta_SKZ[,order]
 mat_Beta_BIP <- mat_Beta_BIP[,order]
-
-BETA <- data.frame()
-NbrLambdas <- dim(mat_Beta_BIP)[1]
-for(idx in 1:NbrLambdas){
-  if(idx == 1){
-    BETA <- data.frame(c(rbind(mat_Beta_SKZ[1,],rbind(mat_Beta_BIP[1,]))))
-  }else{
-    add_idx <- c(rbind(mat_Beta_SKZ[idx,],rbind(mat_Beta_BIP[idx,])))
-    BETA <- cbind(BETA, add_idx)
-  }
-}
-BETA <- as.matrix(BETA)
-x <- f_lambda(beta_SKZ_lambda = t(mat_Beta_SKZ), beta_BIP_lambda = t(mat_Beta_BIP), r_hat = c(rbind(corB_SKZ, corB_BIP)), sd = NULL, beta = BETA)
+array_Beta <- array(c(mat_Beta_SKZ, mat_Beta_BIP), dim = c(dim(mat_Beta_SKZ)[1], dim(mat_Beta_SKZ)[2], 2))
+x <- multivariateLassosum::pseudovalidate(r = cbind(corB_SKZ, corB_BIP), keep_sujets = parsed.2$keep, beta = array_Beta, destandardize = FALSE)
 names(x) <- apply(PANPRS$tuningMatrix[DiffZeroCrit,], 1, FUN = function(x){paste0(round(x,4), collapse = "-")})
 saveRDS(x, file = "PANPRS/Results/Valeurs_f_lambda_PANPRS.Rdata")
 

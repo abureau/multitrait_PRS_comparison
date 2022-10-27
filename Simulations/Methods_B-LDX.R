@@ -15,7 +15,11 @@ library(SummaryLasso)
 library(reticulate)
 library(dplyr)
 
-Data <- ".../Data_Cartagene_imputed"
+#CARTaGENE data aren't publicly available.
+#Data <- ".../Data_Cartagene_imputed"
+#We suggest to used the 1000 genomes data available here:
+#
+Data <- ".../"
 parsed <- parseselect(Data,extract = NULL, exclude = NULL,keep = NULL, remove = NULL,chr = NULL)
 nbr_SNP <- parsed$P
 set.seed(42)
@@ -60,6 +64,9 @@ prob <- c(pi1, pi2, pi3, pi4)
 sd.1 <- lassosum:::sd.bfile(bfile = Data, keep=keep.1)
 sd.2 <- lassosum:::sd.bfile(bfile = Data, keep=keep.2)
 sd.3 <- lassosum:::sd.bfile(bfile = Data, keep=keep.3)
+#Import them from online 
+#sd.1 <- readRDS("sd.1.RDS")
+#sd.2 <- readRDS("sd.2.RDS")
 weight <- 1/sd.3
 weight[!is.finite(weight)] <- 0
 weight.2 <- 1/sd.2
@@ -106,43 +113,15 @@ for (j in 1:nbr_SNP) {
   inv_Sb_snp[,,j] <- inv_Sb
 }
 
-
-#Function
-f_lambda <- function(beta_SKZ_lambda, beta_BIP_lambda, r_hat,sd,keep_sujets,beta){
-  bXy <- r_hat %*% beta 
-  if(!is.null(sd)){
-    weight <- 1/sd
-    weight[!is.finite(weight)] <- 0
-    scaled.beta_SKZ <- as.matrix(Diagonal(x=weight) %*% beta_SKZ_lambda)
-    scaled.beta_BIP <- as.matrix(Diagonal(x=weight) %*% beta_BIP_lambda)
-    pgs_SKZ <- pgs(Data, keep=keep_sujets, weights=scaled.beta_SKZ)
-    pgs_BIP <- pgs(Data, keep=keep_sujets, weights=scaled.beta_BIP)
-  } else{
-    pgs_SKZ <- pgs(Data, keep=keep_sujets, weights=beta_SKZ_lambda)
-    pgs_BIP <- pgs(Data, keep=keep_sujets, weights=beta_BIP_lambda)
-  }
-  if(ncol(pgs_SKZ)>1){
-    pred <- matrix(data = NA,nrow = 2*nrow(pgs_SKZ),ncol = ncol(pgs_SKZ))
-    for(i in 1:ncol(pgs_SKZ)){
-      pred[,i] <- c(rbind(pgs_SKZ[,i],pgs_BIP[,i]))
-    }
-  }else{
-    pgs_SKZ<- as.vector(pgs_SKZ)
-    pgs_BIP<- as.vector(pgs_BIP)
-    pred <- c(rbind(pgs_SKZ,pgs_BIP))
-  }
-  pred2 <- scale(pred, scale=F)
-  bXXb <- colSums(pred2^2) / nrow(pgs_SKZ)
-  result <- as.vector(bXy / sqrt(bXXb))
-  return(result)
-}
-
 #Compute LD matrix using PLINK for PANPRS in the method reference bfiles.
 system(paste0(".../plink --bfile ", Data, " --keep .../keep.2.txt --r2 --ld-window-kb 250 --ld-window-r2 0 --out .../PANPRSLD"))
 plinkLDgenome <- data.table::fread(".../PANPRSLD.ld")
+#Import it from online
+#plinkLDgenome <- readRDS("PANPRSLD.RDS")
 colnames(plinkLDgenome) <- c("CHR_A", "BP_A",  "SNP_A", "CHR_B", "BP_B",  "SNP_B", "R")
 
 for (k in 1:20) {
+  #---- Simulated data ----
   print(paste0("Simulation ", k))
   setwd(paste0(".../Simulation_", k, "/GenCov/"))
   set.seed(k)
@@ -167,12 +146,17 @@ for (k in 1:20) {
   keepoffset.1 <- pos.1 %% 4 * 2
   r_SKZ <- readRDS(".../r_SKZ_simules.Rdata")
   r_BIP <- readRDS(".../r_BIP_simules.Rdata")
+  r_SKZ.2 <- as.vector(readRDS(".../r_SKZ_simules_jeu2.Rdata"))
+  r_BIP.2 <- as.vector(readRDS(".../r_BIP_simules_jeu2.Rdata"))
+  #Import them from online 
+  #r_SKZ <- readRDS(paste0("Standard/Simulation_",k , "/r_SKZ_simule.RData"))
+  #r_BIP <- readRDS(paste0("Standard/Simulation_",k , "/r_BIP_simule.RData"))
+  #r_SKZ.2 <- readRDS(paste0("Standard/Simulation_",k , "/r_SKZ_simule_jeu2.RData"))
+  #r_BIP.2 <- readRDS(paste0("Standard/Simulation_",k , "/r_BIP_simule_jeu2.RData"))
   r_SKZ_destand <- r_SKZ*(1/sd.1)
   r_BIP_destand <- r_BIP*(1/sd.1)
   r <- rbind(r_SKZ,r_BIP)
-  r_SKZ.2 <- as.vector(readRDS(".../r_SKZ_simules_jeu2.Rdata"))
-  r_BIP.2 <- as.vector(readRDS(".../r_BIP_simules_jeu2.Rdata"))
-  r.2 <- c(rbind(r_SKZ,r_BIP))
+  r.2 <- cbind(r_SKZ.2,r_BIP.2)
   #Number of cases and controls used in the summary statitics GWAS.
   #Values obtained using the references of the summary statistics (see Simulation_B-LDX.R).
   size_SKZ <- sum(33426, 32541)
@@ -234,7 +218,7 @@ for (k in 1:20) {
   cl <- makeCluster(cores[1]-2)  
   out_lassosumExt <- multivariateLassosum::lassosum(cor = r, inv_Sb = inv_Sb_snp, inv_Ss = inv_Ss, bfile = Data, keep = keep.2,
                                                     lambda = AllLambdas, shrink = 0.5, maxiter = 100000, trace = 1, blocks = LDblocks,
-					            sample_size = sample_size, cluster = cl)
+                                                    sample_size = sample_size, cluster = cl)
   stopCluster(cl)
   saveRDS(out_lassosumExt, file = "results_lassosumExt_s_0.5.Rdata")
   
@@ -242,20 +226,10 @@ for (k in 1:20) {
   NbrLambdas <- length(AllLambdas)
   mat_Beta_SKZ <- out_lassosumExt$beta[,seq(from = 1, to = (NbrLambdas*2)-1, by = 2)]
   mat_Beta_BIP <- out_lassosumExt$beta[,seq(from = 2, to = NbrLambdas*2, by = 2)]
-  BETA <- data.frame()
-  for(idx in 1:NbrLambdas){
-    if(idx == 1){
-      BETA <- data.frame(c(rbind(out_lassosumExt$beta[,1],rbind(out_lassosumExt$beta[,2]))))
-    }else{
-      add_idx <- c(rbind(out_lassosumExt$beta[,(2*idx)-1],rbind(out_lassosumExt$beta[,2*idx])))
-      BETA <- cbind(BETA, add_idx)
-    }
-  }
-  BETA <- as.matrix(BETA)
-  x <- f_lambda(beta_SKZ_lambda = mat_Beta_SKZ, beta_BIP_lambda = mat_Beta_BIP, r_hat = r.2, sd = sd.2, keep_sujets = parsed.2$keep, beta = BETA)
-  x_lassosumExt <- x
-  names(x) <- paste0("lamdba_", AllLambdas)
-  saveRDS(x, file = "Valeurs_f_lambda_LassosumExtension.Rdata")
+  array_Beta <- array(c(mat_Beta_SKZ, mat_Beta_BIP), dim = c(dim(mat_Beta_SKZ)[1], dim(mat_Beta_SKZ)[2], 2))
+  x_lassosumExt <- multivariateLassosum::pseudovalidate(r = r.2, sd = sd.2, keep_sujets = parsed.2$keep, beta = array_Beta)
+  names(x_lassosumExt) <- paste0("lamdba_", AllLambdas)
+  saveRDS(x_lassosumExt, file = "Valeurs_f_lambda_LassosumExtension.Rdata")
   
   #PRS
   for(Lam in AllLambdas){
@@ -284,20 +258,10 @@ for (k in 1:20) {
   NbrLambdas <- length(AllLambdas)
   mat_Beta_SKZ <- out_lassosumGenCov$beta[,seq(from = 1, to = (NbrLambdas*2)-1, by = 2)]
   mat_Beta_BIP <- out_lassosumGenCov$beta[,seq(from = 2, to = NbrLambdas*2, by = 2)]
-  BETA <- data.frame()
-  for(idx in 1:NbrLambdas){
-    if(idx == 1){
-      BETA <- data.frame(c(rbind(out_lassosumGenCov$beta[,1],rbind(out_lassosumGenCov$beta[,2]))))
-    }else{
-      add_idx <- c(rbind(out_lassosumGenCov$beta[,(2*idx)-1],rbind(out_lassosumGenCov$beta[,2*idx])))
-      BETA <- cbind(BETA, add_idx)
-    }
-  }
-  BETA <- as.matrix(BETA)
-  x <- f_lambda(beta_SKZ_lambda = mat_Beta_SKZ, beta_BIP_lambda = mat_Beta_BIP, r_hat = r.2, sd = sd.2, keep_sujets = parsed.2$keep, beta = BETA)
+  array_Beta <- array(c(mat_Beta_SKZ, mat_Beta_BIP), dim = c(dim(mat_Beta_SKZ)[1], dim(mat_Beta_SKZ)[2], 2))
+  x <- multivariateLassosum::pseudovalidate(r = r.2, sd = sd.2, keep_sujets = parsed.2$keep, beta = array_Beta)
   names(x) <- paste0("lamdba_", AllLambdas)
-  x_lassosumGenCov <- x
-  saveRDS(x, file = "Valeurs_f_lambda_LassosumExtension.Rdata")
+  saveRDS(x, file = "/BetaMulti/Valeurs_f_lambda_LassosumExtension.Rdata")
   
   #PRS
   for(Lam in AllLambdas){
@@ -330,19 +294,10 @@ for (k in 1:20) {
   NbrLambdas <- length(AllLambdas)
   mat_Beta_SKZ <- out_lassosumExtAdapGenCov$beta[,seq(from = 1, to = (NbrLambdas*2)-1, by = 2)]
   mat_Beta_BIP <- out_lassosumExtAdapGenCov$beta[,seq(from = 2, to = NbrLambdas*2, by = 2)]
-  BETA <- data.frame()
-  for(idx in 1:NbrLambdas){
-    if(idx == 1){
-      BETA <- data.frame(c(rbind(out_lassosumExtAdapGenCov$beta[,1],rbind(out_lassosumExtAdapGenCov$beta[,2]))))
-    }else{
-      add_idx <- c(rbind(out_lassosumExtAdapGenCov$beta[,(2*idx)-1],rbind(out_lassosumExtAdapGenCov$beta[,2*idx])))
-      BETA <- cbind(BETA, add_idx)
-    }
-  }
-  BETA <- as.matrix(BETA)
-  x <- f_lambda(beta_SKZ_lambda = mat_Beta_SKZ, beta_BIP_lambda = mat_Beta_BIP, r_hat = r.2, sd = sd.2, keep_sujets = parsed.2$keep, beta = BETA)
-  names(x) <- paste0("lamdba_", AllLambdas)
-  saveRDS(x, file = "BetaGenCov/Valeurs_f_lambda_LassosumExtension.Rdata")
+  array_Beta <- array(c(mat_Beta_SKZ, mat_Beta_BIP), dim = c(dim(mat_Beta_SKZ)[1], dim(mat_Beta_SKZ)[2], 2))
+  x_lassosumGenCov <- multivariateLassosum::pseudovalidate(r = r.2, sd = sd.2, keep_sujets = parsed.2$keep, beta = array_Beta)
+  names(x_lassosumGenCov) <- paste0("lamdba_", AllLambdas)
+  saveRDS(x_lassosumGenCov, file = "BetaGenCov/Valeurs_f_lambda_LassosumExtension.Rdata")
   
   #PRS
   for(Lam in AllLambdas){
@@ -375,19 +330,10 @@ for (k in 1:20) {
   NbrLambdas <- length(AllLambdas)
   mat_Beta_SKZ <- out_lassosumExtAdapBM$beta[,seq(from = 1, to = (NbrLambdas*2)-1, by = 2)]
   mat_Beta_BIP <- out_lassosumExtAdapBM$beta[,seq(from = 2, to = NbrLambdas*2, by = 2)]
-  BETA <- data.frame()
-  for(idx in 1:NbrLambdas){
-    if(idx == 1){
-      BETA <- data.frame(c(rbind(out_lassosumExtAdapBM$beta[,1],rbind(out_lassosumExtAdapBM$beta[,2]))))
-    }else{
-      add_idx <- c(rbind(out_lassosumExtAdapBM$beta[,(2*idx)-1],rbind(out_lassosumExtAdapBM$beta[,2*idx])))
-      BETA <- cbind(BETA, add_idx)
-    }
-  }
-  BETA <- as.matrix(BETA)
-  x <- f_lambda(beta_SKZ_lambda = mat_Beta_SKZ, beta_BIP_lambda = mat_Beta_BIP, r_hat = r.2, sd = sd.2, keep_sujets = parsed.2$keep, beta = BETA)
+  array_Beta <- array(c(mat_Beta_SKZ, mat_Beta_BIP), dim = c(dim(mat_Beta_SKZ)[1], dim(mat_Beta_SKZ)[2], 2))
+  x <- multivariateLassosum::pseudovalidate(r = r.2, sd = sd.2, keep_sujets = parsed.2$keep, beta = array_Beta)
   names(x) <- paste0("lamdba_", AllLambdas)
-  saveRDS(x, file = "BetaMulti/Valeurs_f_lambda_LassosumExtension.Rdata")
+  saveRDS(x, file = paste0("BetaGenCov/Valeurs_f_lambda_LassosumExtension.Rdata"))
   
   #PRS
   for(Lam in AllLambdas){
@@ -402,7 +348,7 @@ for (k in 1:20) {
   }
 
   #---- Lassosum ----
-  AllLambdas <- c(0.00001, 0.00005, 0.0001, 0.0005, 0.001, 0.005, 0.01)
+  AllLambdas <- c(0.00001, 0.00005, 0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05)
 
   #SKZ
   cl <- makeCluster(cores[1]-2) 
@@ -466,9 +412,7 @@ for (k in 1:20) {
   initialTuning <- SummaryLasso::gsPEN(summaryZ = Zmatrix, Nvec = c(size_SKZ, size_BIP), plinkLD = plinkLDgenome, numChrs = 22, fit = FALSE)
 
   for(chr in 1:22){
-    system(paste0(".../plink --bfile ", Data, " --chr ", chr ," --keep .../keep.2.txt --r2 --ld-window-kb 250 --ld-window-r2 0 --out .../Simulation_", k, "/PANPRSLD"))
-    plinkLD <- data.table::fread(paste0(".../Simulation_", k, "/PANPRSLD.ld"))
-    colnames(plinkLD) <- c("CHR_A", "BP_A",  "SNP_A", "CHR_B", "BP_B",  "SNP_B", "R")
+    plinkLD <- plinkLDgenome[plinkLDgenome$CHR_A == chr & plinkLDgenome$CHR_B == chr,]
     plinkLD <- as.data.frame(plinkLD)
     ZmatrixChr <- Zmatrix[ref.bim$V1 == chr,]
     PANPRSchr <- SummaryLasso::gsPEN(summaryZ = ZmatrixChr, Nvec = c(size_SKZ, size_BIP), plinkLD = plinkLD, NumIter = 1000, breaking = 1, 
@@ -502,17 +446,8 @@ for (k in 1:20) {
   NbrLambdas <- dim(PANPRS$tuningMatrix)[1]
   mat_Beta_SKZ <- PANPRS$BetaMatrix[,whereSKZ]
   mat_Beta_BIP <- PANPRS$BetaMatrix[,whereBIP]
-  BETA <- data.frame()
-  for(idx in 1:NbrLambdas){
-    if(idx == 1){
-      BETA <- data.frame(c(rbind(PANPRS$BetaMatrix[1,whereSKZ],rbind(PANPRS$BetaMatrix[1,whereBIP]))))
-    }else{
-      add_idx <- c(rbind(PANPRS$BetaMatrix[idx,whereSKZ],rbind(PANPRS$BetaMatrix[idx,whereBIP])))
-      BETA <- cbind(BETA, add_idx)
-    }
-  }
-  BETA <- as.matrix(BETA)
-  x <- f_lambda(beta_SKZ_lambda = t(mat_Beta_SKZ), beta_BIP_lambda = t(mat_Beta_BIP), r_hat = r.2, sd = NULL, keep_sujets = parsed.2$keep, beta = BETA)
+  array_Beta <- array(c(mat_Beta_SKZ, mat_Beta_BIP), dim = c(dim(mat_Beta_SKZ)[1], dim(mat_Beta_SKZ)[2], 2))
+  x <- multivariateLassosum::pseudovalidate(r = r.2, keep_sujets = parsed.2$keep, beta = array_Beta, destandardize = FALSE)
   names(x) <- apply(PANPRS$tuningMatrix, 1, FUN = function(x){paste0(round(x,4), collapse = "-")})
   saveRDS(x, file = "PANPRS/Valeurs_f_lambda_PANPRS.Rdata")
   
