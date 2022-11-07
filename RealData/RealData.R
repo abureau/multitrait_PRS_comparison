@@ -11,12 +11,18 @@ library(purrr)
 library(doParallel)
 setwd(".../RealData")
 
+#We used the 1000 genomes data as a reference panel. It is available here:
+#https://ftp-trace.ncbi.nih.gov/1000genomes/ftp/release/20130502/
+#We followed these four steps:
+#1- merge the chr1 to chr22 files using a tool such as PLINK;
+#2- extract only the SNPs for which summary statistics are available for both traits;
+#3- remove SNPs where call rate is lower than 0.01;
+#4- remove SNPs where minor allele frequency is lower than 0.001;
+
 #---- MAF control ----
-#We keep the SNPs where the minor allele frequency is higher than 10% when calculated among European subject 
+#We then keep the SNPs where the minor allele frequency is higher than 10% when calculated among European subject 
 #in our 1000 Genomes reference data.
-#
 sujetsRef <- data.table::fread("all_chrs_with_cms4.fam")
-#https://www.internationalgenome.org/data-portal/sample
 ancestry <- data.table::fread("igsr_samples.tsv")
 out <- ancestry[which(ancestry$`Sample name` %in% sujetsRef$V1 & ancestry$`Superpopulation code` == "EUR"), c("Sample name")]
 out$V2 <- out[,1]
@@ -413,7 +419,7 @@ NbrTrait <- length(outMulti$sumstats)
 mat_Beta_SKZ <- outMulti$beta[[NbrS]][,seq(from = 1, to = (NbrLambdas*2)-1, by = 2)]
 mat_Beta_BIP <- outMulti$beta[[NbrS]][,seq(from = 2, to = NbrLambdas*2, by = 2)]
 array_Beta <- array(c(mat_Beta_SKZ, mat_Beta_BIP), dim = c(dim(mat_Beta_SKZ)[1], dim(mat_Beta_SKZ)[2], 2))
-xMulti <- multivariateLassosum::pseudovalidate(r = cbind(corB_SKZ, corB_BIP), sd = sdOmni, beta = array_Beta)
+xMulti <- multivariateLassosum::pseudovalidation(r = cbind(corB_SKZ, corB_BIP), sd = sdOmni, beta = array_Beta)
 names(xMulti) <- paste0("lamdba_", AllLambdas)
 maxMulti <- which.max(xMulti)
 saveRDS(xMulti, file = "Results/multiFlambda.RDS")
@@ -470,7 +476,7 @@ NbrLambdas <- length(outMultiGenCov$lambda)
 mat_Beta_SKZ <- outMultiGenCov$beta[[1]][,seq(from = 1, to = (NbrLambdas*2)-1, by = 2)]
 mat_Beta_BIP <- outMultiGenCov$beta[[1]][,seq(from = 2, to = NbrLambdas*2, by = 2)]
 array_Beta <- array(c(mat_Beta_SKZ, mat_Beta_BIP), dim = c(dim(mat_Beta_SKZ)[1], dim(mat_Beta_SKZ)[2], 2))
-xMultiGenCov <- multivariateLassosum::pseudovalidate(r = cbind(corB_SKZ, corB_BIP), sd = sdOmni, beta = array_Beta)
+xMultiGenCov <- multivariateLassosum::pseudovalidation(r = cbind(corB_SKZ, corB_BIP), sd = sdOmni, beta = array_Beta)
 names(xMultiGenCov) <- paste0("lamdba_", AllLambdas)
 maxMultiGenCov <- which.max(xMultiGenCov)
 saveRDS(xMultiGenCov, file = paste0("Results/multiGenCovFlambda.RDS"))

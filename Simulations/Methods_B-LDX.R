@@ -16,26 +16,34 @@ library(reticulate)
 library(dplyr)
 
 #CARTaGENE data aren't publicly available.
-#Data <- ".../Data_Cartagene_imputed"
 #We suggest to used the 1000 genomes data available here:
-#
-Data <- ".../"
+#https://ftp-trace.ncbi.nih.gov/1000genomes/ftp/release/20130502/
+#Using these data:
+#1- merge the chr1 to chr22 files (ex. using PLINK's --merge);
+#2- extract only the SNPs for which summary statistics are available for both traits (ex. using PLINK's --extract);
+#3- remove SNPs where call rate is lower than 0.01 (ex. using PLINK's --geno 0.01);
+#4- remove SNPs where minor allele frequency is lower than 0.001 (ex. using PLINK's --maf 0.001);
+
+#Complete the path to your data
+path <- ".../"
+
+#Complete with the name you gave to your reference data (1000 Genomes).
 parsed <- parseselect(Data,extract = NULL, exclude = NULL,keep = NULL, remove = NULL,chr = NULL)
 nbr_SNP <- parsed$P
 set.seed(42)
-rows_randomized <- sample(10139)
-keep.1 <- c(rep(FALSE, parsed$N))
-keep.1[rows_randomized[1:8139]] <- TRUE
-keep.2 <- c(rep(FALSE, parsed$N))
-keep.2[rows_randomized[8140:9139]] <- TRUE
-keep.3 <- c(rep(FALSE, parsed$N))
-keep.3[rows_randomized[9140:parsed$N]] <- TRUE
+rows_randomized <- sample(nbr_ind)
+keep.1 <- c(rep(FALSE, nbr_ind))
+keep.1[rows_randomized[1:floor(nbr_ind*0.80)]] <- TRUE
+keep.2 <- c(rep(FALSE, nbr_ind))
+keep.2[rows_randomized[ceiling(nbr_ind*0.80):floor(nbr_ind*0.90)]] <- TRUE
+keep.3 <- c(rep(FALSE, nbr_ind))
+keep.3[rows_randomized[ceiling(nbr_ind*0.90):nbr_ind]] <- TRUE
 parsed.1 <- parseselect(Data, keep = keep.1)
 parsed.2 <- parseselect(Data, keep = keep.2)
 parsed.3 <- parseselect(Data, keep = keep.3)
-rows_1 <- sort(rows_randomized[1:8139])
-rows_2 <- sort(rows_randomized[8140:9139])
-rows_3 <- sort(rows_randomized[9140:parsed$N])
+rows_1 <- sort(rows_randomized[1:floor(nbr_ind*0.80)])
+rows_2 <- sort(rows_randomized[ceiling(nbr_ind*0.80):floor(nbr_ind*0.90)])
+rows_3 <- sort(rows_randomized[ceiling(nbr_ind*0.90):nbr_ind])
 h_obs_SKZ <- 0.47
 h_obs_BIP <- 0.45
 Var_genetique_SKZ <- h_obs_SKZ
@@ -64,7 +72,7 @@ prob <- c(pi1, pi2, pi3, pi4)
 sd.1 <- lassosum:::sd.bfile(bfile = Data, keep=keep.1)
 sd.2 <- lassosum:::sd.bfile(bfile = Data, keep=keep.2)
 sd.3 <- lassosum:::sd.bfile(bfile = Data, keep=keep.3)
-#Import them from online 
+#Import them from Mendeley 
 #sd.1 <- readRDS("sd.1.RDS")
 #sd.2 <- readRDS("sd.2.RDS")
 weight <- 1/sd.3
@@ -78,7 +86,7 @@ sd_Y_BIP <- 1
 
 #Heritabilities and covariance
 #To avoid numerical problems, we fixe 0 to 1e-9
-heritabilite <- readRDS(".../S-LDXR/h_rho_bysnp.RDS")
+heritabilite <- readRDS(paste0(path, "S-LDXR/h_rho_bysnp.RDS"))
 minadj <- 1e-9
 heritabilite$h_SKZ[heritabilite$h_SKZ < minadj] <- minadj
 heritabilite$h_BIP[heritabilite$h_BIP < minadj] <- minadj
@@ -114,16 +122,21 @@ for (j in 1:nbr_SNP) {
 }
 
 #Compute LD matrix using PLINK for PANPRS in the method reference bfiles.
-system(paste0(".../plink --bfile ", Data, " --keep .../keep.2.txt --r2 --ld-window-kb 250 --ld-window-r2 0 --out .../PANPRSLD"))
+#We use a r2 threshold of 0.2 as it takes less memory and time as we found that setting
+#the r2 threshold to 0 wasn't producing better performances.
+Data.bim <- fread(paste0(Data, ".fam"))
+fwrite(Data.bim[rows_2,1:2], paste0(path, "keep.2.txt"))
+#Complet with the path to your PLINK software.
+system(paste0(".../plink --bfile ", Data, " --keep ", path, "keep.2.txt --r2 0.2 --ld-window-kb 250 --ld-window-r2 0 --out ", path, "PANPRSLD"))
 plinkLDgenome <- data.table::fread(".../PANPRSLD.ld")
-#Import it from online
+#Import ours from Mendeley
 #plinkLDgenome <- readRDS("PANPRSLD.RDS")
 colnames(plinkLDgenome) <- c("CHR_A", "BP_A",  "SNP_A", "CHR_B", "BP_B",  "SNP_B", "R")
 
 for (k in 1:20) {
   #---- Simulated data ----
   print(paste0("Simulation ", k))
-  setwd(paste0(".../Simulation_", k, "/GenCov/"))
+  setwd(paste0(path, "Simulation_", k, "/GenCov/"))
   set.seed(k)
 
   Beta <- readRDS("Beta_simules.Rdata")
@@ -144,15 +157,10 @@ for (k in 1:20) {
   pos.1 <- which(parsed.1$keep) - 1
   keepbytes.1 <- floor(pos.1 / 4)
   keepoffset.1 <- pos.1 %% 4 * 2
-  r_SKZ <- readRDS(".../r_SKZ_simules.Rdata")
-  r_BIP <- readRDS(".../r_BIP_simules.Rdata")
-  r_SKZ.2 <- as.vector(readRDS(".../r_SKZ_simules_jeu2.Rdata"))
-  r_BIP.2 <- as.vector(readRDS(".../r_BIP_simules_jeu2.Rdata"))
-  #Import them from online 
-  #r_SKZ <- readRDS(paste0("Standard/Simulation_",k , "/r_SKZ_simule.RData"))
-  #r_BIP <- readRDS(paste0("Standard/Simulation_",k , "/r_BIP_simule.RData"))
-  #r_SKZ.2 <- readRDS(paste0("Standard/Simulation_",k , "/r_SKZ_simule_jeu2.RData"))
-  #r_BIP.2 <- readRDS(paste0("Standard/Simulation_",k , "/r_BIP_simule_jeu2.RData"))
+  r_SKZ <- readRDS(paste0(path, "r_SKZ_simules.Rdata"))
+  r_BIP <- readRDS(paste0(path, "r_BIP_simules.Rdata"))
+  r_SKZ.2 <- as.vector(readRDS(paste0(path, "r_SKZ_simules_jeu2.Rdata")))
+  r_BIP.2 <- as.vector(readRDS(paste0(path, "r_BIP_simules_jeu2.Rdata")))
   r_SKZ_destand <- r_SKZ*(1/sd.1)
   r_BIP_destand <- r_BIP*(1/sd.1)
   r <- rbind(r_SKZ,r_BIP)
@@ -168,13 +176,13 @@ for (k in 1:20) {
 
   #---- Thresholding ----
   NCORES <- nb_cores() - 2
-  if(!file.exists(".../Data_Cartagene_imputed.rds")){
-    snp_readBed2(".../Data_Cartagene_imputed.bed",
-                 backingfile = ".../Data_Cartagene_imputed.rds",
+  if(!file.exists(paste0(path, "Data_Cartagene_imputed.rds"))){
+    snp_readBed2(paste0(path, "Data_Cartagene_imputed.bed"),
+                 backingfile = paste0(path, "Data_Cartagene_imputed.rds"),
                  ncores = NCORES)
   }
   threshold_param <- c(1, 0.75, 0.5, 0.25, 0.1, 0.05, 0.001, 1e-4)
-  obj.bigSNP <- snp_attach(".../Data_Cartagene_imputed.rds")
+  obj.bigSNP <- snp_attach(paste0(path, "Data_Cartagene_imputed.rds"))
 
   #Validation
   ##SKZ
@@ -227,7 +235,7 @@ for (k in 1:20) {
   mat_Beta_SKZ <- out_lassosumExt$beta[,seq(from = 1, to = (NbrLambdas*2)-1, by = 2)]
   mat_Beta_BIP <- out_lassosumExt$beta[,seq(from = 2, to = NbrLambdas*2, by = 2)]
   array_Beta <- array(c(mat_Beta_SKZ, mat_Beta_BIP), dim = c(dim(mat_Beta_SKZ)[1], dim(mat_Beta_SKZ)[2], 2))
-  x_lassosumExt <- multivariateLassosum::pseudovalidate(r = r.2, sd = sd.2, keep_sujets = parsed.2$keep, beta = array_Beta)
+  x_lassosumExt <- multivariateLassosum::pseudovalidation(r = r.2, sd = sd.2, keep_sujets = parsed.2$keep, beta = array_Beta)
   names(x_lassosumExt) <- paste0("lamdba_", AllLambdas)
   saveRDS(x_lassosumExt, file = "Valeurs_f_lambda_LassosumExtension.Rdata")
   
@@ -259,7 +267,7 @@ for (k in 1:20) {
   mat_Beta_SKZ <- out_lassosumGenCov$beta[,seq(from = 1, to = (NbrLambdas*2)-1, by = 2)]
   mat_Beta_BIP <- out_lassosumGenCov$beta[,seq(from = 2, to = NbrLambdas*2, by = 2)]
   array_Beta <- array(c(mat_Beta_SKZ, mat_Beta_BIP), dim = c(dim(mat_Beta_SKZ)[1], dim(mat_Beta_SKZ)[2], 2))
-  x <- multivariateLassosum::pseudovalidate(r = r.2, sd = sd.2, keep_sujets = parsed.2$keep, beta = array_Beta)
+  x <- multivariateLassosum::pseudovalidation(r = r.2, sd = sd.2, keep_sujets = parsed.2$keep, beta = array_Beta)
   names(x) <- paste0("lamdba_", AllLambdas)
   saveRDS(x, file = "/BetaMulti/Valeurs_f_lambda_LassosumExtension.Rdata")
   
@@ -295,7 +303,7 @@ for (k in 1:20) {
   mat_Beta_SKZ <- out_lassosumExtAdapGenCov$beta[,seq(from = 1, to = (NbrLambdas*2)-1, by = 2)]
   mat_Beta_BIP <- out_lassosumExtAdapGenCov$beta[,seq(from = 2, to = NbrLambdas*2, by = 2)]
   array_Beta <- array(c(mat_Beta_SKZ, mat_Beta_BIP), dim = c(dim(mat_Beta_SKZ)[1], dim(mat_Beta_SKZ)[2], 2))
-  x_lassosumGenCov <- multivariateLassosum::pseudovalidate(r = r.2, sd = sd.2, keep_sujets = parsed.2$keep, beta = array_Beta)
+  x_lassosumGenCov <- multivariateLassosum::pseudovalidation(r = r.2, sd = sd.2, keep_sujets = parsed.2$keep, beta = array_Beta)
   names(x_lassosumGenCov) <- paste0("lamdba_", AllLambdas)
   saveRDS(x_lassosumGenCov, file = "BetaGenCov/Valeurs_f_lambda_LassosumExtension.Rdata")
   
@@ -331,7 +339,7 @@ for (k in 1:20) {
   mat_Beta_SKZ <- out_lassosumExtAdapBM$beta[,seq(from = 1, to = (NbrLambdas*2)-1, by = 2)]
   mat_Beta_BIP <- out_lassosumExtAdapBM$beta[,seq(from = 2, to = NbrLambdas*2, by = 2)]
   array_Beta <- array(c(mat_Beta_SKZ, mat_Beta_BIP), dim = c(dim(mat_Beta_SKZ)[1], dim(mat_Beta_SKZ)[2], 2))
-  x <- multivariateLassosum::pseudovalidate(r = r.2, sd = sd.2, keep_sujets = parsed.2$keep, beta = array_Beta)
+  x <- multivariateLassosum::pseudovalidation(r = r.2, sd = sd.2, keep_sujets = parsed.2$keep, beta = array_Beta)
   names(x) <- paste0("lamdba_", AllLambdas)
   saveRDS(x, file = paste0("BetaGenCov/Valeurs_f_lambda_LassosumExtension.Rdata"))
   
@@ -368,7 +376,7 @@ for (k in 1:20) {
   ##SKZ
   BETA_SKZ <- out_SKZ_lassosum$beta
   cl <- makeCluster(cores[1]-2) 
-  #We use the pseudovalidate function from the lassosum package for validation as we're using correlation from the same set as the one
+  #We use the pseudovalidation function from the lassosum package for validation as we're using correlation from the same set as the one
   #used to modelize lassosum. (date set #2)
   pv_SKZ <- lassosum:::pseudovalidation(Data, beta = BETA_SKZ, cor = r_SKZ.2, keep = parsed.2$keep, sd = sd.2, cluster = cl)
   stopCluster(cl)
@@ -379,7 +387,7 @@ for (k in 1:20) {
   ##BIP
   BETA_BIP <- out_BIP_lassosum$beta
   cl <- makeCluster(cores[1]-2) 
-  #We use the pseudovalidate function from the lassosum package for validation as we're using correlation from the same set as the one
+  #We use the pseudovalidation function from the lassosum package for validation as we're using correlation from the same set as the one
   #used to modelize lassosum. (date set #2)
   pv_BIP <- lassosum:::pseudovalidation(Data, beta = BETA_BIP, cor = r_BIP.2, keep = parsed.2$keep, sd = sd.2, cluster = cl)
   stopCluster(cl)
@@ -447,7 +455,7 @@ for (k in 1:20) {
   mat_Beta_SKZ <- PANPRS$BetaMatrix[,whereSKZ]
   mat_Beta_BIP <- PANPRS$BetaMatrix[,whereBIP]
   array_Beta <- array(c(mat_Beta_SKZ, mat_Beta_BIP), dim = c(dim(mat_Beta_SKZ)[1], dim(mat_Beta_SKZ)[2], 2))
-  x <- multivariateLassosum::pseudovalidate(r = r.2, keep_sujets = parsed.2$keep, beta = array_Beta, destandardize = FALSE)
+  x <- multivariateLassosum::pseudovalidation(r = r.2, keep_sujets = parsed.2$keep, beta = array_Beta, destandardize = FALSE)
   names(x) <- apply(PANPRS$tuningMatrix, 1, FUN = function(x){paste0(round(x,4), collapse = "-")})
   saveRDS(x, file = "PANPRS/Valeurs_f_lambda_PANPRS.Rdata")
   

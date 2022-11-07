@@ -11,6 +11,8 @@ library(purrr)
 library(doParallel)
 setwd(".../RealData")
 
+#Follow RealData.R first.
+
 #Control for MAF<0.1 on European subjects is already done. Data are found in
 #.../RealData/Data/methodRef bfiles.
 
@@ -221,7 +223,7 @@ Zmatrix <- matrix(c(sign(ssA_SKZ$Cor)*abs(qnorm(p=(ssA_SKZ$P)/2)), sign(ssA_BIP$
 row.names(Zmatrix) <- omni$V2[matchOmni$order]
 
 #Compute LDscore using PLINK in the method reference bfiles, OmniExpress.
-system(paste0(".../plink --bfile ", omni, " --r2 --ld-window-kb 250 --ld-window-r2 0 --out .../PANPRS/Data/PANPRSLD-RefOmni"))
+system(paste0(".../plink --bfile ", omni, " --r2 0.2 --ld-window-kb 250 --ld-window-r2 0 --out .../PANPRS/Data/PANPRSLD-RefOmni"))
 plinkLDgenome <- fread("PANPRS/Data/PANPRSLD-RefOmni.ld")
 colnames(plinkLDgenome) <- c("CHR_A", "BP_A",  "SNP_A", "CHR_B", "BP_B",  "SNP_B", "R")
 #Generate the set of tuning parameters on a modified version of gsPEN which doesn't fit the model, but only outputs the tuning matrix.
@@ -268,7 +270,7 @@ order <- match(omnibim$V2, orderSKZ)
 mat_Beta_SKZ <- mat_Beta_SKZ[,order]
 mat_Beta_BIP <- mat_Beta_BIP[,order]
 array_Beta <- array(c(mat_Beta_SKZ, mat_Beta_BIP), dim = c(dim(mat_Beta_SKZ)[1], dim(mat_Beta_SKZ)[2], 2))
-x <- multivariateLassosum::pseudovalidate(r = cbind(corB_SKZ, corB_BIP), keep_sujets = parsed.2$keep, beta = array_Beta, destandardize = FALSE)
+x <- multivariateLassosum::pseudovalidation(r = cbind(corB_SKZ, corB_BIP), keep_sujets = parsed.2$keep, beta = array_Beta, destandardize = FALSE)
 names(x) <- apply(PANPRS$tuningMatrix[DiffZeroCrit,], 1, FUN = function(x){paste0(round(x,4), collapse = "-")})
 saveRDS(x, file = "PANPRS/Results/Valeurs_f_lambda_PANPRS.Rdata")
 

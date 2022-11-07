@@ -18,6 +18,21 @@ library(xgboost)
 #This code shows how we generated our simulated data.
 #Objects derived from CARTaGENE data are found here:
 #https://data.mendeley.com/datasets/jxz9jwssf6/1
+#Except for simulated PRSs. They are found on this GitHub repository.
+#If you wish to use our data, we suggest to download every R objects, 
+#from Github and Mendeley, and putting them all in a directory. 
+#The codes will be easier to follow.
+
+#Otherwise, we suggest to used the 1000 genomes data available here:
+#https://ftp-trace.ncbi.nih.gov/1000genomes/ftp/release/20130502/
+#Using these data:
+#1- merge the chr1 to chr22 files (ex. using PLINK's --merge);
+#2- extract only the SNPs for which summary statistics are available for both traits (ex. using PLINK's --extract);
+#3- remove SNPs where call rate is lower than 0.01 (ex. using PLINK's --geno 0.01);
+#4- remove SNPs where minor allele frequency is lower than 0.001 (ex. using PLINK's --maf 0.001);
+
+#Complete the path to your data
+path <- ".../"
 
 #---- Summary statistics SNPs matching ----
 #Trait 1 - Schizophrenia
@@ -39,8 +54,8 @@ ss_SKZ <- ss_SKZ[matchSS$order,]
 ss_BIP <- ss_BIP[matchSS$ref.extract,]
 
 #Matching of the reference data set and the two sets of summary statistics. Alleles matching isn't necessary here.
-#Reference data from CARTaGENE are not available publicly. Still step can be skipped if one doesn't have this data set.
-Data <- ".../Data_Cartagene_imputed"
+#Reference data from CARTaGENE are not available publicly. Still, this step can be skipped if one doesn't have this data set.
+Data <- paste0(path, "Data_Cartagene_imputed")
 bim <- data.table::fread(paste0(Data, ".bim"))
 matchTest <- lassosum:::matchpos(tomatch = ss_BIP, ref.df = bim, chr = "CHR", ref.chr = "V1", pos = "POS", ref.pos = "V4", auto.detect.tomatch = F, auto.detect.ref = F, rm.duplicates = T)
 ss_BIP <- ss_BIP[matchTest$order,]
@@ -53,7 +68,7 @@ ss_SKZ$N <- rowSums(ss_SKZ[,c("Nco", "Nca")])
 ss_SKZ$Z <- sign(ss_SKZ$BETA)*abs(qnorm(p=(ss_SKZ$P)/2))
 ss_SKZ <- ss_SKZ[,c("SNP", "CHR", "BP", "A1", "A2", "Z", "N")]
 ss_SKZ <- ss_SKZ[order(S$CHR, S$BP),]
-data.table::fwrite(ss_SKZ, ".../S-LDXR/ss_SKZ.txt", col.names = TRUE, sep = "\t", row.names = FALSE)
+data.table::fwrite(ss_SKZ, paste0(path, "S-LDXR/ss_SKZ.txt"), col.names = TRUE, sep = "\t", row.names = FALSE)
 
 ss_BIP <- ss_BIP[,c(3,1,2,4,5,6,8,15,14)]
 colnames(ss_BIP) <- c("SNP", "CHR", "BP", "A1", "A2", "BETA", "PVAL", "Nco", "Nca")
@@ -61,9 +76,9 @@ ss_BIP$N <- rowSums(ss_BIP[,c("Nco", "Nca")])
 ss_BIP$Z <- sign(ss_BIP$BETA)*abs(qnorm(p=(ss_BIP$PVAL)/2))
 ss_BIP <- ss_BIP[,c("SNP", "CHR", "BP", "A1", "A2", "Z", "N")]
 ss_BIP <- ss_BIP[order(ss_BIP$CHR, ss_BIP$BP),]
-data.table::fwrite(ss_BIP, ".../S-LDXR/ss_BIP.txt", col.names = TRUE, sep = "\t", row.names = FALSE)
-system("gzip .../S-LDXR/ss_SKZ.txt")
-system("gzip .../S-LDXR/ss_BIP.txt")
+data.table::fwrite(ss_BIP, paste0(path, "S-LDXR/ss_BIP.txt"), col.names = TRUE, sep = "\t", row.names = FALSE)
+system(paste0("gzip ", path, "S-LDXR/ss_SKZ.txt"))
+system(paste0("gzip ", path, "S-LDXR/ss_BIP.txt"))
 
 #Run S-LDXR following this code:
 #Simulation_B-LDX.sh
@@ -71,7 +86,7 @@ system("gzip .../S-LDXR/ss_BIP.txt")
 
 #---- Heritabilities and covariance computation ----
 #Import S-LDXR output.
-estimates <- fread(paste0(".../S-LDXR/out.txt"))
+estimates <- fread(paste0(path, "S-LDXR/out.txt"))
 #We want the continuous annotations first, then the binary ones.
 estimates <- estimates[c(54,55,56,57,59,61,62,60, 1:53,58),]
 bim <- bim %>% setNames(., c("CHR", "SNP", "CM", "POS", "A1", "A2"))
@@ -84,7 +99,7 @@ for(i in 1:22){
   data_i <- bim[bim$CHR == i,]
   comp_i <- data_i
   #Import the annotations of this chromosome
-  annotations <- fread(paste0(".../S-LDXR/annotations/baseline-LD-X.", i, ".annot.gz")) %>% as.data.frame()
+  annotations <- fread(paste0(path, "S-LDXR/annotations/baseline-LD-X.", i, ".annot.gz")) %>% as.data.frame()
   annotations <- distinct(annotations)
   #Be sure that the annotations are in the same order as they are in the files where thetas are estimated.
   annotations <- annotations[, c("CHR", "BP", "SNP", "CM", estimates$ANNOT)]
@@ -148,32 +163,32 @@ h <- h[c("h_SKZ", "h_BIP", "rho", "CHR", "BP", "SNP")]
 h <- h[match(data$SNP, h$SNP),]
 check <- data.frame(data$SNP, h$SNP, data$SNP == h$SNP)
 print("The order is ok ", all(check[,3]))
-saveRDS(h, ".../S-LDXR/h_rho_bysnp.RDS")
-#Import it from online
+saveRDS(h, paste0(path, "S-LDXR/h_rho_bysnp.RDS"))
+#Import it from Mendeley 
 #h <- readRDS("h_rho_bysnp.RDS")
 
 #---- Create folders to save objects ----
 for(i in 1:20){
-  system(paste0("mkdir .../Simulation_", i, "/GenCov"))
+  system(paste0("mkdir ", path, "Simulation_", i, "/GenCov"))
 }
 
 #---- Modify the simulations ----
 parsed <- parseselect(Data,extract = NULL, exclude = NULL,keep = NULL, remove = NULL,chr = NULL)
 nbr_SNP <- parsed$P
 set.seed(42)
-rows_randomized <- sample(10139)
-keep.1 <- c(rep(FALSE, parsed$N))
-keep.1[rows_randomized[1:8139]] <- TRUE
-keep.2 <- c(rep(FALSE, parsed$N))
-keep.2[rows_randomized[8140:9139]] <- TRUE
-keep.3 <- c(rep(FALSE, parsed$N))
-keep.3[rows_randomized[9140:parsed$N]] <- TRUE
+rows_randomized <- sample(nbr_ind)
+keep.1 <- c(rep(FALSE, nbr_ind))
+keep.1[rows_randomized[1:floor(nbr_ind*0.80)]] <- TRUE
+keep.2 <- c(rep(FALSE, nbr_ind))
+keep.2[rows_randomized[ceiling(nbr_ind*0.80):floor(nbr_ind*0.90)]] <- TRUE
+keep.3 <- c(rep(FALSE, nbr_ind))
+keep.3[rows_randomized[ceiling(nbr_ind*0.90):nbr_ind]] <- TRUE
 parsed.1 <- parseselect(Data, keep = keep.1)
 parsed.2 <- parseselect(Data, keep = keep.2)
 parsed.3 <- parseselect(Data, keep = keep.3)
-rows_1 <- sort(rows_randomized[1:8139])
-rows_2 <- sort(rows_randomized[8140:9139])
-rows_3 <- sort(rows_randomized[9140:parsed$N])
+rows_1 <- sort(rows_randomized[1:floor(nbr_ind*0.80)])
+rows_2 <- sort(rows_randomized[ceiling(nbr_ind*0.80):floor(nbr_ind*0.90)])
+rows_3 <- sort(rows_randomized[ceiling(nbr_ind*0.90):nbr_ind])
 h_obs_SKZ <- 0.47
 h_obs_BIP <- 0.45
 Var_genetique_SKZ <- h_obs_SKZ
@@ -202,11 +217,11 @@ pi2 <- Var_SKZ_beta / sigma2 - pi1
 pi3 <- Var_BIP_beta / sigma2 - pi1
 pi4 <- 1 - pi1 - pi2 - pi3
 prob <- c(pi1, pi2, pi3, pi4)
-sd.1 <- lassosum:::sd.bfile(bfile = Data,keep=keep.1)
-sd.2 <- lassosum:::sd.bfile(bfile = Data,keep=keep.2)
-#Import them both from online 
-#sd.1 <- readRDS("sd.1.RDS")
-#sd.2 <- readRDS("sd.2.RDS")
+#sd.1 <- lassosum:::sd.bfile(bfile = Data,keep=keep.1)
+#sd.2 <- lassosum:::sd.bfile(bfile = Data,keep=keep.2)
+#Import the ones we generated  from Mendeley  
+sd.1 <- readRDS("sd.1.RDS")
+sd.2 <- readRDS("sd.2.RDS")
 Var_Y_SKZ <- 1
 sd_Y_SKZ <- 1
 Var_Y_BIP <- 1
@@ -215,12 +230,12 @@ sd_Y_BIP <- 1
 # Loop over the simulation replicates
 for(k in 1:20){
   print(paste0("Simulation : ", k))
-  setwd(paste0(".../Simulation_", k, "/"))
+  setwd(paste0(path, "Simulation_", k, "/"))
   set.seed(k)
 
   #---- Simulate the new betas ----
   #Import the estimated heritabilities and covariances. SNPs are in the good order.
-  heritabilite <- readRDS(".../S-LDXR/h_rho_bysnp.RDS")
+  heritabilite <- readRDS(paste0(path, "S-LDXR/h_rho_bysnp.RDS"))
 
   #Sample which SNP "causes" which trait.
   pot_BOTH <- which(heritabilite$h_BIP>0 & heritabilite$h_SKZ>0)
@@ -358,7 +373,7 @@ for(k in 1:20){
   r_BIP <- r[2,]
   saveRDS(r_SKZ, file = "GenCov/r_SKZ_simules.Rdata")
   saveRDS(r_BIP, file = "GenCov/r_BIP_simules.Rdata")
-  #Import them both from online 
+  #Import the ones we generated  from Mendeley  
   #r_SKZ <- readRDS(paste0("B-LDX/Simulation_",k , "/r_SKZ_simule.RData"))
   #r_BIP <- readRDS(paste0("B-LDX/Simulation_",k , "/r_BIP_simule.RData"))
 
@@ -405,7 +420,7 @@ for(k in 1:20){
   r_BIP <- r[2,]
   saveRDS(r_SKZ, file = "GenCovNewSim/r_SKZ_simules_jeu2.Rdata")
   saveRDS(r_BIP, file = "GenCovNewSim/r_BIP_simules_jeu2.Rdata")
-  #Import them both from online 
+  #Import the ones we generated  from Mendeley  
   #r_SKZ <- readRDS(paste0("B-LDX/Simulation_",k , "/r_SKZ_simule_jeu2.RData"))
   #r_BIP <- readRDS(paste0("B-LDX/Simulation_",k , "/r_BIP_simule_jeu2.RData"))
   stopCluster(cl)
@@ -415,4 +430,7 @@ for(k in 1:20){
   saveRDS(PGS_simule_SKZ, file = "GenCov/PGS_simule_SKZ.Rdata")
   PGS_simule_BIP <- pgs(Data, keep=parsed.3$keep, weights=Beta_simule_BIP)
   saveRDS(PGS_simule_BIP, file = "GenCov/PGS_simule_BIP.Rdata")
+  #Import the ones we generated  from GitHub 
+  #PGS_simule_SKZ <- readRDS(paste0("B-LDX/PGS_simule",k , "_SKZ.Rdata"))
+  #PGS_simule_BIP <- readRDS(paste0("B-LDX/PGS_simule",k , "_BIP.Rdata"))
 }
