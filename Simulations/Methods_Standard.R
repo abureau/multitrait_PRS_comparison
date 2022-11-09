@@ -27,24 +27,39 @@ CaG <- FALSE
 #Complete the path to your data
 path <- ".../"
 
-Data <- paste0(path, "allchrs4")
-parsed <- parseselect(Data,extract = NULL, exclude = NULL,keep = NULL, remove = NULL,chr = NULL)
-nbr_SNP <- parsed$P
-nbr_ind <- parsed$N
-set.seed(42)
-rows_randomized <- sample(10139)
-keep.1 <- c(rep(FALSE, nbr_ind))
-keep.1[rows_randomized[1:8139]] <- TRUE
-keep.2 <- c(rep(FALSE, nbr_ind))
-keep.2[rows_randomized[8140:9139]] <- TRUE
-keep.3 <- c(rep(FALSE, nbr_ind))
-keep.3[rows_randomized[9140:nbr_ind]] <- TRUE
-parsed.1 <- parseselect(Data, keep = keep.1)
-parsed.2 <- parseselect(Data, keep = keep.2)
-parsed.3 <- parseselect(Data, keep = keep.3)
-rows_1 <- sort(rows_randomized[1:8139])
-rows_2 <- sort(rows_randomized[8140:9139])
-rows_3 <- sort(rows_randomized[9140:nbr_ind])
+if(CaG){
+  #Please enter the path to your CARTaGENE data
+  Data <- paste0(".../")
+  parsed <- parseselect(Data,extract = NULL, exclude = NULL,keep = NULL, remove = NULL,chr = NULL)
+  nbr_SNP <- parsed$P
+  nbr_ind <- parsed$N
+  set.seed(42)
+  rows_randomized <- sample(nbr_ind)
+  keep.2 <- c(rep(FALSE, nbr_ind))
+  keep.2[rows_randomized[8140:9139]] <- TRUE
+  keep.3 <- c(rep(FALSE, nbr_ind))
+  keep.3[rows_randomized[9140:nbr_ind]] <- TRUE
+  parsed.2 <- parseselect(Data, keep = keep.2)
+  parsed.3 <- parseselect(Data, keep = keep.3)
+  rows_2 <- sort(rows_randomized[8140:9139])
+  rows_3 <- sort(rows_randomized[9140:nbr_ind])
+}else{
+  #In this case, let's divide the 1000 Genomes European data in 2.
+  Data <- paste0(path, "allchrs4")
+  parsed <- parseselect(Data,extract = NULL, exclude = NULL,keep = NULL, remove = NULL,chr = NULL)
+  nbr_SNP <- parsed$P
+  nbr_ind <- parsed$N
+  set.seed(42)
+  rows_randomized <- sample(nbr_ind)
+  keep.2 <- c(rep(FALSE, nbr_ind))
+  keep.2[rows_randomized[1:floor(nbr_ind/2)]] <- TRUE
+  keep.3 <- c(rep(FALSE, nbr_ind))
+  keep.3[rows_randomized[(floor(nbr_ind/2)+1):nbr_ind]] <- TRUE
+  parsed.2 <- parseselect(Data, keep = keep.2)
+  parsed.3 <- parseselect(Data, keep = keep.3)
+  rows_2 <- sort(rows_randomized[1:floor(nbr_ind/2)])
+  rows_3 <- sort(rows_randomized[(floor(nbr_ind/2)+1):nbr_ind])
+}
 h_obs_SKZ <- 0.47
 h_obs_BIP <- 0.45
 Var_genetique_SKZ <- h_obs_SKZ
@@ -70,20 +85,16 @@ pi2 <- Var_SKZ_beta / sigma2 - pi1
 pi3 <- Var_BIP_beta / sigma2 - pi1
 pi4 <- 1 - pi1 - pi2 - pi3
 prob <- c(pi1, pi2, pi3, pi4)
-#sd.1 <- lassosum:::sd.bfile(bfile = Data, keep=keep.1)
-#sd.2 <- lassosum:::sd.bfile(bfile = Data, keep=keep.2)
-#sd.3 <- lassosum:::sd.bfile(bfile = Data, keep=keep.3)
-#Import them from Mendeley 
-sd.1 <- readRDS("sd.1.RDS")
-sd.2 <- readRDS("sd.2.RDS")
-weight <- 1/sd.3
-weight[!is.finite(weight)] <- 0
-weight.2 <- 1/sd.2
-weight.2[!is.finite(weight.2)] <- 0
 Var_Y_SKZ <- 1
 sd_Y_SKZ <- 1
 Var_Y_BIP <- 1
 sd_Y_BIP <- 1
+sd.2 <- lassosum:::sd.bfile(bfile = Data, keep=keep.2)
+weight.2 <- 1/sd.2
+weight.2[!is.finite(weight.2)] <- 0
+sd.3 <- lassosum:::sd.bfile(bfile = Data, keep=keep.3)
+weight <- 1/sd.3
+weight[!is.finite(weight)] <- 0
 
 #Heritabilities and covariance
 #To avoid numerical problems, we fixe 0 to 1e-9
@@ -127,7 +138,7 @@ for (j in 1:nbr_SNP) {
 #the r2 threshold to 0 wasn't producing better performances.
 #Data.bim <- fread(paste0(Data, ".fam"))
 #fwrite(Data.bim[rows_2,1:2], paste0(path, "keep.2.txt"))
-#Complet with the path to your PLINK software.
+#Complete with the path to your PLINK software.
 #system(paste0(".../plink --bfile ", Data, " --keep ", path, "keep.2.txt --r2 0.2 --ld-window-kb 250 --ld-window-r2 0 --out ", path, "PANPRSLD"))
 #plinkLDgenome <- data.table::fread(".../PANPRSLD.ld")
 #Import ours from Mendeley
@@ -225,7 +236,7 @@ for (k in 1:20) {
   cl <- makeCluster(cores[1]-2)  
   out_lassosumExt <- multivariateLassosum::lassosum(cor = r, inv_Sb = inv_Sb_snp, inv_Ss = inv_Ss, bfile = Data, keep = keep.2,
                                                     lambda = AllLambdas, shrink = 0.5, maxiter = 100000, trace = 1, blocks = LDblocks,
-					            sample_size = sample_size, cluster = cl)
+                                                    sample_size = sample_size, cluster = cl)
   stopCluster(cl)
   saveRDS(out_lassosumExt,file = "results_lassosumExt_s_0.5.Rdata")
   
@@ -470,12 +481,12 @@ for (k in 1:20) {
   
   #---- LDPRED2 ----
   NCORES <- nb_cores() - 2
-  if(!file.exists(paste0(path, "Data_Cartagene_imputed.rds"))){
-    snp_readBed2(paste0(path, "Data_Cartagene_imputed.bed"),
-                 backingfile = paste0(path, "Data_Cartagene_imputed.rds"),
+  if(!file.exists(paste0(path, Data, ".rds"))){
+    snp_readBed2(paste0(path, Data, ".bed"),
+                 backingfile = paste0(path, Data, ".rds"),
                  ncores = NCORES)
   }
-  obj.bigSNP <- snp_attach(paste0("Data_Cartagene_imputed.rds"))
+  obj.bigSNP <- snp_attach(paste0(Data, ".rds"))
   G   <- obj.bigSNP$genotypes
   CHR <- as.integer(obj.bigSNP$map$chromosome)
   POS <- obj.bigSNP$map$physical.pos

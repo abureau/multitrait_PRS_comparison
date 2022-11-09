@@ -9,12 +9,9 @@ library(bigsnpr)
 library(dplyr)
 library(purrr)
 library(doParallel)
-setwd(".../RealData")
 
 #Follow RealData.R first.
-
-#Control for MAF<0.1 on European subjects is already done. Data are found in
-#.../RealData/Data/methodRef bfiles.
+setwd(".../RealData")
 
 #---- Clumping, pvalue minimum ----
 #Reference panel (1000 Genome).
@@ -55,10 +52,10 @@ out <- data.table::data.table(out)
 data.table::fwrite(out, "Data/pvalueClumping.txt", row.names = FALSE, sep = "\t", col.names = TRUE)
 
 #Clumping (number of resulting SNPs = 365 527)
-system("/mnt-biostats/Plink/plink --bfile .../Data/clumpingRef --clump .../Data/pvalueClumping.txt --clump-p1 1 --clump-r2 0.5 --clump-kb 250 --clump-snp-field SNP --clump-field pval --out .../PANPRS/Data/clumpingOut")
+system("/mnt-biostats/Plink/plink --bfile .../Data/methodRef --clump .../Data/pvalueClumping.txt --clump-p1 1 --clump-r2 0.5 --clump-kb 250 --clump-snp-field SNP --clump-field pval --out .../PANPRS/Data/clumpingOut")
 
 #Only keep these SNPs in the reference data set.
-system("/mnt-biostats/Plink/plink --bfile .../Data/clumpingRef --extract .../PANPRS/Data/clumpingOut.clumped --make-bed --out .../PANPRS/Data/methodRef")
+system("/mnt-biostats/Plink/plink --bfile .../Data/methodRef --extract .../PANPRS/Data/clumpingOut.clumped --make-bed --out .../PANPRS/Data/methodRef")
 
 #---- Pseudo summary statistics ----
 #Ref panel

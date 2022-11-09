@@ -23,6 +23,8 @@ library(xgboost)
 #from Github and Mendeley, and putting them all in a directory. 
 #The codes will be easier to follow.
 
+
+
 #Every code suppose that your data are all in the same directory.
 #Complete the path to your data
 path <- ".../"
@@ -46,6 +48,7 @@ names(ss_BIP)[names(ss_BIP) == '#CHROM'] <- "CHR"
 ss_BIP$CHR <- as.numeric(ss_BIP$CHR)
 
 #Matching the two sets of summary statistics
+#It was already done in 1000GenomesDataPrep.R, but for those who doesn't use 1000 Genomes, here's the code again.
 matchSS <- lassosum:::matchpos(tomatch = ss_SKZ, ref.df = ss_BIP, auto.detect.tomatch = F, auto.detect.ref = F,
   chr = "CHR", ref.chr = "CHR", pos = "BP", ref.pos = "POS", ref = "A1", ref.ref = "A1", alt = "A2", ref.alt = "A2",
   exclude.ambiguous = F, silent = F, rm.duplicates = F)
@@ -53,8 +56,8 @@ ss_SKZ <- ss_SKZ[matchSS$order,]
 ss_BIP <- ss_BIP[matchSS$ref.extract,]
 
 #Matching of the reference data set and the two sets of summary statistics. Alleles matching isn't necessary here.
-#Reference data from CARTaGENE are not available publicly. Still, this step can be skipped if one doesn't have this data set.
-Data <- paste0(path, "Data_Cartagene_imputed")
+#Reference data from CARTaGENE are not available publicly.
+Data <- paste0(path, "Data_Cartagene")
 bim <- data.table::fread(paste0(Data, ".bim"))
 matchTest <- lassosum:::matchpos(tomatch = ss_BIP, ref.df = bim, chr = "CHR", ref.chr = "V1", pos = "POS", ref.pos = "V4", auto.detect.tomatch = F, auto.detect.ref = F, rm.duplicates = T)
 ss_BIP <- ss_BIP[matchTest$order,]
@@ -163,8 +166,6 @@ h <- h[match(data$SNP, h$SNP),]
 check <- data.frame(data$SNP, h$SNP, data$SNP == h$SNP)
 print("The order is ok ", all(check[,3]))
 saveRDS(h, paste0(path, "S-LDXR/h_rho_bysnp.RDS"))
-#Import it from Mendeley 
-#h <- readRDS("h_rho_bysnp.RDS")
 
 #---- Create folders to save objects ----
 for(i in 1:20){

@@ -76,10 +76,25 @@ ref.bim <- ref.bim[m.ref$ref.extract,]
 fwrite(ref.bim$V2, "snpToExtract.txt", sep = "\t", row.names = FALSE, col.names = FALSE)
 
 #Only keep these matching SNPs in our 1000 genomes bfiles
+#Please feel free to change the path to you PLINK software.
 system(".../plink --bfile allchrs --extract snpToExtract.txt --make-bed --out allchrs2")
 
 #---- Call rate QC ----
+#Please feel free to change the path to you PLINK software.
 system(".../plink --bfile allchrs2 --geno 0.01 --make-bed --out allchrs3")
 
 #---- MAF QC ----
+#Please feel free to change the path to you PLINK software.
 system(".../plink --bfile allchrs3 --maf 0.001 --make-bed --out allchrs4")
+
+#---- Only keep European subjects ----
+#We keep European subject.
+#Ancestry are found here: https://www.internationalgenome.org/data-portal/sample
+sujetsRef <- data.table::fread("allchrs4.fam")
+ancestry <- data.table::fread("igsr_samples.tsv")
+ancestry <- ancestry[which(ancestry$`Sample name` %in% sujetsRef$V1 & ancestry$`Superpopulation code` == "EUR"), c("Sample name")]
+ancestry$V2 <- ancestry[,1]
+data.table::fwrite(data.table::data.table(ancestry), "sujetsEUR.txt", col.names = FALSE, sep = "\t", row.names = FALSE)
+#Please feel free to change the path to you PLINK software.
+system(".../plink --bfileallchrs4 --keep sujetsEUR.txt --make-bed --out allchrs4")
+

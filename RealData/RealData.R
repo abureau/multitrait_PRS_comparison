@@ -9,26 +9,12 @@ library(bigsnpr)
 library(dplyr)
 library(purrr)
 library(doParallel)
+
 setwd(".../RealData")
 
-#We used the 1000 genomes data as a reference panel. It is available here:
-#https://ftp-trace.ncbi.nih.gov/1000genomes/ftp/release/20130502/
-#We followed these four steps:
-#1- merge the chr1 to chr22 files using a tool such as PLINK;
-#2- extract only the SNPs for which summary statistics are available for both traits;
-#3- remove SNPs where call rate is lower than 0.01;
-#4- remove SNPs where minor allele frequency is lower than 0.001;
-
 #---- MAF control ----
-#We then keep the SNPs where the minor allele frequency is higher than 10% when calculated among European subject 
-#in our 1000 Genomes reference data.
-sujetsRef <- data.table::fread("all_chrs_with_cms4.fam")
-ancestry <- data.table::fread("igsr_samples.tsv")
-out <- ancestry[which(ancestry$`Sample name` %in% sujetsRef$V1 & ancestry$`Superpopulation code` == "EUR"), c("Sample name")]
-out$V2 <- out[,1]
-data.table::fwrite(data.table::data.table(out), "/Data/sujetsEUR.txt", col.names = FALSE, sep = "\t", row.names = FALSE)
 #Control for MAF<0.1. 3 639 921 SNPs remaining.
-system(".../plink --bfile .../all_chrs_with_cms4 --extract .../Data/communMarkerRef.txt --keep .../Data/sujetsEUR.txt --maf 0.1 --make-bed --out .../Data/methodRef")
+system(".../plink --bfile .../allchrs4 --maf 0.1 --make-bed --out .../Data/methodRef")
 
 #---- Pseudo summary statistics ----
 #Reference panel (1000 Genome)

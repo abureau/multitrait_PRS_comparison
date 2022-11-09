@@ -25,7 +25,7 @@ library(xgboost)
 #Complete the path to your data
 path <- ".../"
 
-Data <- paste0(path, "Data_Cartagene_imputed")
+Data <- paste0(path, "Data_Cartagene")
 parsed <- parseselect(Data,extract = NULL, exclude = NULL,keep = NULL, remove = NULL,chr = NULL)
 nbr_SNP <- parsed$P
 nbr_ind <- parsed$N
