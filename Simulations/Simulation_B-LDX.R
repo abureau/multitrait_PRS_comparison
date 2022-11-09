@@ -23,14 +23,7 @@ library(xgboost)
 #from Github and Mendeley, and putting them all in a directory. 
 #The codes will be easier to follow.
 
-#Otherwise, we suggest to used the 1000 genomes data available here:
-#https://ftp-trace.ncbi.nih.gov/1000genomes/ftp/release/20130502/
-#Using these data:
-#1- merge the chr1 to chr22 files (ex. using PLINK's --merge);
-#2- extract only the SNPs for which summary statistics are available for both traits (ex. using PLINK's --extract);
-#3- remove SNPs where call rate is lower than 0.01 (ex. using PLINK's --geno 0.01);
-#4- remove SNPs where minor allele frequency is lower than 0.001 (ex. using PLINK's --maf 0.001);
-
+#Every code suppose that your data are all in the same directory.
 #Complete the path to your data
 path <- ".../"
 
@@ -38,11 +31,17 @@ path <- ".../"
 #Trait 1 - Schizophrenia
 #Data are available here : https://pgc.unc.edu/for-researchers/download-results/
 ss_SKZ <- fread('PGC3_SCZ_wave3_public.v2.tsv',fill = TRUE)
+#There's a problem at line 5328756. Column were not correctly delimited. This is how we corrected it.
+ss_SKZ[5328756,1] <- 21 ;ss_SKZ[5328756,2] <- "rs148878475";ss_SKZ[5328756,3]<-9648204;
+ss_SKZ[5328756,4] <- "C" ; ss_SKZ[5328756,5] <- "T" ; ss_SKZ[5328756,6] <- 0.9878 ;
+ss_SKZ[5328756,7] <- 0.9845 ;ss_SKZ[5328756,8] <- 0.1375 ;ss_SKZ[5328756,9] <- 7.5732 ;
+ss_SKZ[5328756,10] <- 1.0014 ;ss_SKZ[5328756,11] <- 0.0432 ;ss_SKZ[5328756,12] <- 0 ;
 ss_SKZ$CHR <- as.numeric(ss_SKZ$CHR)
 
 #Trait 2 - Bipolar disorder
 #Data are available here : https://pgc.unc.edu/for-researchers/download-results/
 ss_BIP <- fread('pgc-bip2021-all.vcf.tsv')
+#There is no problem here.
 names(ss_BIP)[names(ss_BIP) == '#CHROM'] <- "CHR"
 ss_BIP$CHR <- as.numeric(ss_BIP$CHR)
 
@@ -175,20 +174,21 @@ for(i in 1:20){
 #---- Modify the simulations ----
 parsed <- parseselect(Data,extract = NULL, exclude = NULL,keep = NULL, remove = NULL,chr = NULL)
 nbr_SNP <- parsed$P
+nbr_ind <- parsed$N
 set.seed(42)
-rows_randomized <- sample(nbr_ind)
+rows_randomized <- sample(10139)
 keep.1 <- c(rep(FALSE, nbr_ind))
-keep.1[rows_randomized[1:floor(nbr_ind*0.80)]] <- TRUE
+keep.1[rows_randomized[1:8139]] <- TRUE
 keep.2 <- c(rep(FALSE, nbr_ind))
-keep.2[rows_randomized[ceiling(nbr_ind*0.80):floor(nbr_ind*0.90)]] <- TRUE
+keep.2[rows_randomized[8140:9139]] <- TRUE
 keep.3 <- c(rep(FALSE, nbr_ind))
-keep.3[rows_randomized[ceiling(nbr_ind*0.90):nbr_ind]] <- TRUE
+keep.3[rows_randomized[9140:nbr_ind]] <- TRUE
 parsed.1 <- parseselect(Data, keep = keep.1)
 parsed.2 <- parseselect(Data, keep = keep.2)
 parsed.3 <- parseselect(Data, keep = keep.3)
-rows_1 <- sort(rows_randomized[1:floor(nbr_ind*0.80)])
-rows_2 <- sort(rows_randomized[ceiling(nbr_ind*0.80):floor(nbr_ind*0.90)])
-rows_3 <- sort(rows_randomized[ceiling(nbr_ind*0.90):nbr_ind])
+rows_1 <- sort(rows_randomized[1:8139])
+rows_2 <- sort(rows_randomized[8140:9139])
+rows_3 <- sort(rows_randomized[9140:nbr_ind])
 h_obs_SKZ <- 0.47
 h_obs_BIP <- 0.45
 Var_genetique_SKZ <- h_obs_SKZ
@@ -371,11 +371,11 @@ for(k in 1:20){
   r <- rbind(r_SKZ,r_BIP)
   r_SKZ <- r[1,]
   r_BIP <- r[2,]
-  saveRDS(r_SKZ, file = "GenCov/r_SKZ_simules.Rdata")
-  saveRDS(r_BIP, file = "GenCov/r_BIP_simules.Rdata")
   #Import the ones we generated  from Mendeley  
   #r_SKZ <- readRDS(paste0("B-LDX/Simulation_",k , "/r_SKZ_simule.RData"))
   #r_BIP <- readRDS(paste0("B-LDX/Simulation_",k , "/r_BIP_simule.RData"))
+  saveRDS(r_SKZ, file = "GenCov/r_SKZ_simules.Rdata")
+  saveRDS(r_BIP, file = "GenCov/r_BIP_simules.Rdata")
 
   #Standardized betas the second data set
   Beta0 <- matrix(data = NA, nrow = 2, ncol = nbr_SNP)
@@ -418,19 +418,19 @@ for(k in 1:20){
   r <- rbind(r_SKZ,r_BIP)
   r_SKZ <- r[1,]
   r_BIP <- r[2,]
-  saveRDS(r_SKZ, file = "GenCovNewSim/r_SKZ_simules_jeu2.Rdata")
-  saveRDS(r_BIP, file = "GenCovNewSim/r_BIP_simules_jeu2.Rdata")
   #Import the ones we generated  from Mendeley  
   #r_SKZ <- readRDS(paste0("B-LDX/Simulation_",k , "/r_SKZ_simule_jeu2.RData"))
   #r_BIP <- readRDS(paste0("B-LDX/Simulation_",k , "/r_BIP_simule_jeu2.RData"))
+  saveRDS(r_SKZ, file = "GenCovNewSim/r_SKZ_simules_jeu2.Rdata")
+  saveRDS(r_BIP, file = "GenCovNewSim/r_BIP_simules_jeu2.Rdata")
   stopCluster(cl)
 
   #Simulated PRSs
   PGS_simule_SKZ <- pgs(Data, keep=parsed.3$keep, weights=Beta_simule_SKZ)
-  saveRDS(PGS_simule_SKZ, file = "GenCov/PGS_simule_SKZ.Rdata")
   PGS_simule_BIP <- pgs(Data, keep=parsed.3$keep, weights=Beta_simule_BIP)
-  saveRDS(PGS_simule_BIP, file = "GenCov/PGS_simule_BIP.Rdata")
   #Import the ones we generated  from GitHub 
   #PGS_simule_SKZ <- readRDS(paste0("B-LDX/PGS_simule",k , "_SKZ.Rdata"))
   #PGS_simule_BIP <- readRDS(paste0("B-LDX/PGS_simule",k , "_BIP.Rdata"))
+  saveRDS(PGS_simule_SKZ, file = "GenCov/PGS_simule_SKZ.Rdata")
+  saveRDS(PGS_simule_BIP, file = "GenCov/PGS_simule_BIP.Rdata")
 }

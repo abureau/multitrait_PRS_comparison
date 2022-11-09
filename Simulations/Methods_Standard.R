@@ -16,35 +16,35 @@ library(reticulate)
 library(dplyr)
 
 #CARTaGENE data aren't publicly available.
-#We suggest to used the 1000 genomes data available here:
-#https://ftp-trace.ncbi.nih.gov/1000genomes/ftp/release/20130502/
-#Using these data:
-#1- merge the chr1 to chr22 files (ex. using PLINK's --merge);
-#2- extract only the SNPs for which summary statistics are available for both traits (ex. using PLINK's --extract);
-#3- remove SNPs where call rate is lower than 0.01 (ex. using PLINK's --geno 0.01);
-#4- remove SNPs where minor allele frequency is lower than 0.001 (ex. using PLINK's --maf 0.001);
+#we propose to used the 1000 genomes data as a reference panel for the methods.
+#Please follow 1000GenomesDataPrep.R code to produce allchrs4 PLINK bfiles
 
+#Are you using CARTaGENE data as a reference panel or are you substituting it with 1000 Genomes data?
+#Please set CaG to TRUE if you are using CARTaGENE data.
+CaG <- FALSE
+
+#Every code suppose that your data are all in the same directory.
 #Complete the path to your data
 path <- ".../"
 
-#Complete with the name you gave to your reference data (1000 Genomes).
-Data <- paste0(path, "")
+Data <- paste0(path, "allchrs4")
 parsed <- parseselect(Data,extract = NULL, exclude = NULL,keep = NULL, remove = NULL,chr = NULL)
 nbr_SNP <- parsed$P
+nbr_ind <- parsed$N
 set.seed(42)
-rows_randomized <- sample(nbr_ind)
+rows_randomized <- sample(10139)
 keep.1 <- c(rep(FALSE, nbr_ind))
-keep.1[rows_randomized[1:floor(nbr_ind*0.80)]] <- TRUE
+keep.1[rows_randomized[1:8139]] <- TRUE
 keep.2 <- c(rep(FALSE, nbr_ind))
-keep.2[rows_randomized[ceiling(nbr_ind*0.80):floor(nbr_ind*0.90)]] <- TRUE
+keep.2[rows_randomized[8140:9139]] <- TRUE
 keep.3 <- c(rep(FALSE, nbr_ind))
-keep.3[rows_randomized[ceiling(nbr_ind*0.90):nbr_ind]] <- TRUE
+keep.3[rows_randomized[9140:nbr_ind]] <- TRUE
 parsed.1 <- parseselect(Data, keep = keep.1)
 parsed.2 <- parseselect(Data, keep = keep.2)
 parsed.3 <- parseselect(Data, keep = keep.3)
-rows_1 <- sort(rows_randomized[1:floor(nbr_ind*0.80)])
-rows_2 <- sort(rows_randomized[ceiling(nbr_ind*0.80):floor(nbr_ind*0.90)])
-rows_3 <- sort(rows_randomized[ceiling(nbr_ind*0.90):nbr_ind])
+rows_1 <- sort(rows_randomized[1:8139])
+rows_2 <- sort(rows_randomized[8140:9139])
+rows_3 <- sort(rows_randomized[9140:nbr_ind])
 h_obs_SKZ <- 0.47
 h_obs_BIP <- 0.45
 Var_genetique_SKZ <- h_obs_SKZ
@@ -70,12 +70,12 @@ pi2 <- Var_SKZ_beta / sigma2 - pi1
 pi3 <- Var_BIP_beta / sigma2 - pi1
 pi4 <- 1 - pi1 - pi2 - pi3
 prob <- c(pi1, pi2, pi3, pi4)
-sd.1 <- lassosum:::sd.bfile(bfile = Data, keep=keep.1)
-sd.2 <- lassosum:::sd.bfile(bfile = Data, keep=keep.2)
-sd.3 <- lassosum:::sd.bfile(bfile = Data, keep=keep.3)
+#sd.1 <- lassosum:::sd.bfile(bfile = Data, keep=keep.1)
+#sd.2 <- lassosum:::sd.bfile(bfile = Data, keep=keep.2)
+#sd.3 <- lassosum:::sd.bfile(bfile = Data, keep=keep.3)
 #Import them from Mendeley 
-#sd.1 <- readRDS("sd.1.RDS")
-#sd.2 <- readRDS("sd.2.RDS")
+sd.1 <- readRDS("sd.1.RDS")
+sd.2 <- readRDS("sd.2.RDS")
 weight <- 1/sd.3
 weight[!is.finite(weight)] <- 0
 weight.2 <- 1/sd.2
@@ -125,14 +125,16 @@ for (j in 1:nbr_SNP) {
 #Compute LD matrix using PLINK for PANPRS in the method reference bfiles.
 #We use a r2 threshold of 0.2 as it takes less memory and time as we found that setting
 #the r2 threshold to 0 wasn't producing better performances.
-Data.bim <- fread(paste0(Data, ".fam"))
-fwrite(Data.bim[rows_2,1:2], paste0(path, "keep.2.txt"))
+#Data.bim <- fread(paste0(Data, ".fam"))
+#fwrite(Data.bim[rows_2,1:2], paste0(path, "keep.2.txt"))
 #Complet with the path to your PLINK software.
-system(paste0(".../plink --bfile ", Data, " --keep ", path, "keep.2.txt --r2 0.2 --ld-window-kb 250 --ld-window-r2 0 --out ", path, "PANPRSLD"))
-plinkLDgenome <- data.table::fread(".../PANPRSLD.ld")
+#system(paste0(".../plink --bfile ", Data, " --keep ", path, "keep.2.txt --r2 0.2 --ld-window-kb 250 --ld-window-r2 0 --out ", path, "PANPRSLD"))
+#plinkLDgenome <- data.table::fread(".../PANPRSLD.ld")
 #Import ours from Mendeley
-#plinkLDgenome <- readRDS("PANPRSLD.RDS")
+plinkLDgenome <- readRDS("PANPRSLD.RDS")
 colnames(plinkLDgenome) <- c("CHR_A", "BP_A",  "SNP_A", "CHR_B", "BP_B",  "SNP_B", "R")
+#The file we provide contains every R2. Only keep the ones >0.2
+plinkLDgenome <- plinkLDgenome[plinkLDgenome$R>0.2]
 
 for (k in 1:20) {
   #---- Simulated data ----
@@ -176,15 +178,7 @@ for (k in 1:20) {
   pvalue_BIP <- 2*pnorm(abs(r_BIP_destand/sqrt(1/size_BIP)), mean = 0, sd = 1, lower.tail = FALSE)
 
   #---- Thresholding ----
-  NCORES <- nb_cores()
-  if(!file.exists(paste0(path, "Data_Cartagene_imputed.rds"))){
-    snp_readBed2(paste0(path, "Data_Cartagene_imputed.bed"),
-                 backingfile = paste0(path, "Data_Cartagene_imputed.rds"),
-                 ncores = NCORES)
-  }
   threshold_param <- c(1, 0.75, 0.5, 0.25, 0.1, 0.05, 0.001, 1e-4)
-  obj.bigSNP <- snp_attach(paste0("Data_Cartagene_imputed.rds"))
-
   #Validation
   ##SKZ
   for(Lam in threshold_param){
@@ -192,9 +186,9 @@ for (k in 1:20) {
     add[pvalue_SKZ > Lam] <- 0
     if(which(threshold_param == Lam) == 1) {BETA_SKZ <- data.frame(add) } else {BETA_SKZ <- cbind(BETA_SKZ, add)}
   }
-  cl <- makeCluster(cores[1]-2) 
   #We use the pseudovalidation function from the lassosum package for validation as we're using correlation from the same set as the one
   #used to modelize lassosum. (date set #2)
+  cl <- makeCluster(cores[1]-2) 
   pv_SKZ <- lassosum:::pseudovalidation(Data, beta = BETA_SKZ, cor = r_SKZ.2, keep = parsed.2$keep, sd = sd.2, cluster = cl)
   stopCluster(cl)
   x_SKZ <- as.vector(pv_SKZ)
@@ -207,9 +201,9 @@ for (k in 1:20) {
     add[pvalue_BIP > Lam] <- 0
     if(which(threshold_param == Lam) == 1) {BETA_BIP <- data.frame(add) } else {BETA_BIP <- cbind(BETA_BIP, add)}
   }
-  cl <- makeCluster(cores[1]-2) 
   #We use the pseudovalidation function from the lassosum package for validation as we're using correlation from the same set as the one
   #used to modelize lassosum. (date set #2)
+  cl <- makeCluster(cores[1]-2) 
   pv_BIP <- lassosum:::pseudovalidation(Data, beta = BETA_BIP, cor = r_BIP.2, keep = parsed.2$keep, sd = sd.2, cluster = cl)
   stopCluster(cl)
   x_BIP <- as.vector(pv_BIP)
@@ -475,6 +469,13 @@ for (k in 1:20) {
   }
   
   #---- LDPRED2 ----
+  NCORES <- nb_cores() - 2
+  if(!file.exists(paste0(path, "Data_Cartagene_imputed.rds"))){
+    snp_readBed2(paste0(path, "Data_Cartagene_imputed.bed"),
+                 backingfile = paste0(path, "Data_Cartagene_imputed.rds"),
+                 ncores = NCORES)
+  }
+  obj.bigSNP <- snp_attach(paste0("Data_Cartagene_imputed.rds"))
   G   <- obj.bigSNP$genotypes
   CHR <- as.integer(obj.bigSNP$map$chromosome)
   POS <- obj.bigSNP$map$physical.pos
