@@ -136,8 +136,8 @@ for (j in 1:nbr_SNP) {
 #Compute LD matrix using PLINK for PANPRS in the method reference bfiles.
 #We use a r2 threshold of 0.2 as it takes less memory and time as we found that setting
 #the r2 threshold to 0 wasn't producing better performances.
-#Data.bim <- fread(paste0(Data, ".fam"))
-#fwrite(Data.bim[rows_2,1:2], paste0(path, "keep.2.txt"))
+#Data.fam <- fread(paste0(Data, ".fam"))
+#fwrite(Data.fam[rows_2,1:2], paste0(path, "keep.2.txt"))
 #Complet with the path to your PLINK software.
 #system(paste0(".../plink --bfile ", Data, " --keep ", path, "keep.2.txt --r2 0.2 --ld-window-kb 250 --ld-window-r2 0 --out ", path, "PANPRSLD"))
 #plinkLDgenome <- data.table::fread(".../PANPRSLD.ld")

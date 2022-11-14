@@ -46,7 +46,7 @@ Xr <- Xr[matchRef$order,]
 ss_BIP <- ss_BIP[matchXr$ref.extract,]
 ss_SKZ <- ss_SKZ[matchXr$ref.extract,]
 
-#Minimum p-value between BIP and SKZ symstats.
+#Minimum p-value between BIP and SKZ sumstats.
 out <- data.frame("SNP" = Xr$V2, "pval" = apply(data.frame(ss_SKZ$P, ss_BIP$PVAL), 1, min))
 out <- data.table::data.table(out)
 data.table::fwrite(out, "Data/pvalueClumping.txt", row.names = FALSE, sep = "\t", col.names = TRUE)
@@ -219,7 +219,7 @@ matchOmni <- lassosum:::matchpos(tomatch = omnibim, ref.df = ssA_SKZ, auto.detec
 Zmatrix <- matrix(c(sign(ssA_SKZ$Cor)*abs(qnorm(p=(ssA_SKZ$P)/2)), sign(ssA_BIP$Cor)*abs(qnorm(p=(ssA_BIP$PVAL)/2))), ncol = 2)
 row.names(Zmatrix) <- omni$V2[matchOmni$order]
 
-#Compute LDscore using PLINK in the method reference bfiles, OmniExpress.
+#Compute LD matrix using PLINK in the method reference bfiles, OmniExpress.
 system(paste0(".../plink --bfile ", omni, " --r2 0.2 --ld-window-kb 250 --ld-window-r2 0 --out .../PANPRS/Data/PANPRSLD-RefOmni"))
 plinkLDgenome <- fread("PANPRS/Data/PANPRSLD-RefOmni.ld")
 colnames(plinkLDgenome) <- c("CHR_A", "BP_A",  "SNP_A", "CHR_B", "BP_B",  "SNP_B", "R")

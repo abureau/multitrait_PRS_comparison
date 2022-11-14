@@ -14,6 +14,7 @@ setwd(".../RealData")
 
 #---- MAF control ----
 #Control for MAF<0.1. 3 639 921 SNPs remaining.
+#We are using the 1000 Genomes data created in 1000GenomesDataPrep.R
 system(".../plink --bfile .../allchrs4 --maf 0.1 --make-bed --out .../Data/methodRef")
 
 #---- Pseudo summary statistics ----
