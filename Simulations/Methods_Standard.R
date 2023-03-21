@@ -14,6 +14,8 @@ library(xgboost)
 library(SummaryLasso) 
 library(reticulate)
 library(dplyr)
+options(bigstatsr.check.parallel.blas = FALSE)
+
 
 #CARTaGENE data aren't publicly available.
 #we propose to used the 1000 genomes data as a reference panel for the methods.
@@ -23,63 +25,101 @@ library(dplyr)
 #Please set CaG to TRUE if you are using CARTaGENE data.
 CaG <- FALSE
 
+#Please enter the path to your plink software.
+pathPlink <- ".../plink"
+
 #Every code suppose that your data are all in the same directory.
 #Complete the path to your data
-path <- ".../"
+pathBase <- ".../"
+
+
+#Please specify which kind of scenario you want to simulate.
+#This `for` loop will set the parameters needed for each simulation.
+#Please enter the simulation type. It needs to be written the same ways as it is in the original paper of this project.
+simuType <- "..."
+set.seed(42)
+
+if(simuType=="n = 29,330"){
+  n.1 <- 23330; n.2 <- 26330; nbr_ind <- 29330
+  h_obs_SKZ <- 0.47; h_obs_BIP <- 0.45
+  Correlation <- 0.59
+  sigma2 <- 2.263e-6
+  pi1 <- 0.35
+  path <- paste0(pathBase, "29300ind/")
+}else if(simuType=="n = 10,139"){
+  n.1 <- 8139; n.2 <- 9139; nbr_ind <- 10139
+  h_obs_SKZ <- 0.47; h_obs_BIP <- 0.45
+  Correlation <- 0.59
+  sigma2 <- 2e-6
+  pi1 <- 0.35
+  path <- paste0(pathBase, "10139ind/")
+}else if(simuType=="n = 29,330; Low Polygenicity"){
+  n.1 <- 23330; n.2 <- 26330; nbr_ind <- 29330
+  h_obs_SKZ <- 0.47; h_obs_BIP <- 0.45
+  Correlation <- 0.59
+  sigma2 <- 1.06244e-05
+  pi1 <- 0.08
+  path <- paste0(pathBase, "29300ind_lowPoly/")
+}else if(simuType=="n = 29,330; Low Heritability"){
+  n.1 <- 23330; n.2 <- 26330; nbr_ind <- 29330
+  h_obs_SKZ <- 0.094; h_obs_BIP <- 0.090
+  Correlation <- 0.59
+  sigma2 <- 4.53e-7
+  pi1 <- 0.35
+  path <- paste0(pathBase, "29300ind_lowHeri/")
+}else if(simuType=="n = 29,330; Moderate Correlation"){
+  n.1 <- 23330; n.2 <- 26330; nbr_ind <- 29330
+  h_obs_SKZ <- 0.47; h_obs_BIP <- 0.45
+  Correlation <- 0.43
+  sigma2 <- 2.263e-6
+  pi1 <- 0.35
+  path <- paste0(pathBase, "29300ind_moderateCor/")
+}else{
+  warning("Please provide an actual simulation scenario, written as it is in the original paper of this project.")
+}
 
 if(CaG){
   #Please enter the path to your CARTaGENE data
-  Data <- paste0(".../")
+  Data <- paste0(pathBase, "...")
   parsed <- parseselect(Data,extract = NULL, exclude = NULL,keep = NULL, remove = NULL,chr = NULL)
   nbr_SNP <- parsed$P
-  nbr_ind <- parsed$N
-  set.seed(42)
   rows_randomized <- sample(nbr_ind)
   keep.2 <- c(rep(FALSE, nbr_ind))
-  keep.2[rows_randomized[8140:9139]] <- TRUE
+  keep.2[rows_randomized[(n.1+1):n.2]] <- TRUE
   keep.3 <- c(rep(FALSE, nbr_ind))
-  keep.3[rows_randomized[9140:nbr_ind]] <- TRUE
+  keep.3[rows_randomized[(n.2+1):nbr_ind]] <- TRUE
   parsed.2 <- parseselect(Data, keep = keep.2)
   parsed.3 <- parseselect(Data, keep = keep.3)
-  rows_2 <- sort(rows_randomized[8140:9139])
-  rows_3 <- sort(rows_randomized[9140:nbr_ind])
+  rows_2 <- sort(rows_randomized[(n.1+1):n.2])
+  rows_3 <- sort(rows_randomized[(n.2+1):nbr_ind])
 }else{
-  #In this case, let's divide the 1000 Genomes European data in 2.
-  Data <- paste0(path, "allchrs4")
-  parsed <- parseselect(Data,extract = NULL, exclude = NULL,keep = NULL, remove = NULL,chr = NULL)
-  nbr_SNP <- parsed$P
-  nbr_ind <- parsed$N
-  set.seed(42)
-  rows_randomized <- sample(nbr_ind)
-  keep.2 <- c(rep(FALSE, nbr_ind))
-  keep.2[rows_randomized[1:floor(nbr_ind/2)]] <- TRUE
-  keep.3 <- c(rep(FALSE, nbr_ind))
-  keep.3[rows_randomized[(floor(nbr_ind/2)+1):nbr_ind]] <- TRUE
-  parsed.2 <- parseselect(Data, keep = keep.2)
-  parsed.3 <- parseselect(Data, keep = keep.3)
-  rows_2 <- sort(rows_randomized[1:floor(nbr_ind/2)])
-  rows_3 <- sort(rows_randomized[(floor(nbr_ind/2)+1):nbr_ind])
+  if(simuType=="n = 10,139"){
+    warning("This type of simulation cannot be executed using 1000 Genomes data as sample size isn't large enough to uses smaller n.2 and n.3 sizes.")
+  }else{
+    #In this case, let's divide the 1000 Genomes European data in 2.
+    Data <- paste0(pathBase, "allchrs4")
+    parsed <- parseselect(Data,extract = NULL, exclude = NULL,keep = NULL, remove = NULL,chr = NULL)
+    rm("n.1", "n.2")); nbr_ind <- parsed$N
+    nbr_SNP <- parsed$P
+    rows_randomized <- sample(nbr_ind)
+    keep.2 <- c(rep(FALSE, nbr_ind))
+    keep.2[rows_randomized[1:floor(nbr_ind/2)]] <- TRUE
+    keep.3 <- c(rep(FALSE, nbr_ind))
+    keep.3[rows_randomized[(floor(nbr_ind/2)+1):nbr_ind]] <- TRUE
+    parsed.2 <- parseselect(Data, keep = keep.2)
+    parsed.3 <- parseselect(Data, keep = keep.3)
+    rows_2 <- sort(rows_randomized[1:floor(nbr_ind/2)])
+    rows_3 <- sort(rows_randomized[(floor(nbr_ind/2)+1):nbr_ind])
+  }
 }
-h_obs_SKZ <- 0.47
-h_obs_BIP <- 0.45
-Var_genetique_SKZ <- h_obs_SKZ
-Var_genetique_BIP <- h_obs_BIP
-Var_environm_SKZ <- 1 - Var_genetique_SKZ
-Var_environm_BIP <- 1 - Var_genetique_BIP
-Correlation <- 0.59
-Covariance <- Correlation * sqrt(Var_genetique_SKZ) * sqrt(Var_genetique_BIP)
-Var_SKZ_beta <- Var_genetique_SKZ / nbr_SNP
-Var_BIP_beta <- Var_genetique_BIP / nbr_SNP
+Var_environm_SKZ <- 1 - h_obs_SKZ; Var_environm_BIP <- 1 - h_obs_BIP
+Var_SKZ_beta <- h_obs_SKZ / nbr_SNP; Var_BIP_beta <- h_obs_BIP / nbr_SNP
+Covariance <- Correlation * sqrt(h_obs_SKZ) * sqrt(h_obs_BIP)
 Covariance_beta <- Covariance / nbr_SNP
 Sigma_b <- matrix(data = c(Var_SKZ_beta, Covariance_beta, Covariance_beta, Var_BIP_beta), nrow = 2, ncol = 2)
 Sigma_s <- matrix(data = c(Var_environm_SKZ, 0, 0, Var_environm_BIP), nrow = 2, ncol = 2)
-inv_Sb <- solve(Sigma_b)
 inv_Ss <- solve(Sigma_s)
-inv_Sb <- matrix(as.numeric(format(round(inv_Sb, 3), nsmall = 3)),nrow = 2,ncol = 2)
-sigma2 <- 2e-6
-maximum <- min(Var_SKZ_beta/sigma2, Var_BIP_beta/sigma2)
-minimum <- Covariance_beta/sigma2
-pi1 <- 0.35
+inv_Sb <- matrix(as.numeric(format(round(solve(Sigma_b), 3), nsmall = 3)),nrow = 2,ncol = 2)
 ro <- Covariance_beta / (pi1 * sigma2)
 pi2 <- Var_SKZ_beta / sigma2 - pi1
 pi3 <- Var_BIP_beta / sigma2 - pi1
@@ -89,6 +129,9 @@ Var_Y_SKZ <- 1
 sd_Y_SKZ <- 1
 Var_Y_BIP <- 1
 sd_Y_BIP <- 1
+#sd.1 <- lassosum:::sd.bfile(bfile = Data,keep=keep.1)
+#Import the ones we generated  from online 
+sd.1 <- readRDS(paste0(path, "sd.1.RDS"))
 sd.2 <- lassosum:::sd.bfile(bfile = Data, keep=keep.2)
 weight.2 <- 1/sd.2
 weight.2[!is.finite(weight.2)] <- 0
@@ -98,7 +141,7 @@ weight[!is.finite(weight)] <- 0
 
 #Heritabilities and covariance
 #To avoid numerical problems, we fixe 0 to 1e-9
-heritabilite <- readRDS(paste0(path, "S-LDXR/h_rho_bysnp.RDS"))
+heritabilite <- readRDS(paste0(pathBase, "S-LDXR/h_rho_bysnp.RDS"))
 minadj <- 1e-9
 heritabilite$h_SKZ[heritabilite$h_SKZ < minadj] <- minadj
 heritabilite$h_BIP[heritabilite$h_BIP < minadj] <- minadj
@@ -112,7 +155,6 @@ delta <- sqrt(delta_SKZ*delta_BIP)
 #Var-Covar matrices
 Sigma_b_snp <- array(data = NA, dim = c(2,2, nbr_SNP))
 Verif_sigma <- array(data = NA, dim = c(2,2, nbr_SNP))
-nProb <- 0
 for (j in 1:nbr_SNP) {
   h2_BIP <- heritabilite[j, "h_BIP"]
   h2_SKZ <- heritabilite[j, "h_SKZ"]
@@ -121,7 +163,7 @@ for (j in 1:nbr_SNP) {
   h2_BIP <- delta_BIP*h2_BIP
   rho    <- delta*rho
   detCond<- ((h2_BIP*h2_SKZ)-(rho^2)) <= 0
-  if(detCond){rho <- sqrt(max(c((h2_BIP*h2_SKZ)-0.001,0))); nProb <- nProb+1}
+  if(detCond){rho <- sqrt(max(c((h2_BIP*h2_SKZ)-0.001,0)))}
   mat_j  <- matrix(data = c(h2_SKZ, rho, rho, h2_BIP), ncol = 2)
   Verif_sigma[,,j] <- mat_j
   Sigma_b_snp[,,j]  <- round(solve(mat_j),0)
@@ -134,23 +176,18 @@ for (j in 1:nbr_SNP) {
 }
 
 #Compute LD matrix using PLINK for PANPRS in the method reference bfiles.
-#We use a r2 threshold of 0.2 as it takes less memory and time as we found that setting
-#the r2 threshold to 0 wasn't producing better performances.
-#Data.bim <- fread(paste0(Data, ".fam"))
-#fwrite(Data.bim[rows_2,1:2], paste0(path, "keep.2.txt"))
-#Complete with the path to your PLINK software.
-#system(paste0(".../plink --bfile ", Data, " --keep ", path, "keep.2.txt --r2 0.2 --ld-window-kb 250 --ld-window-r2 0 --out ", path, "PANPRSLD"))
-#plinkLDgenome <- data.table::fread(".../PANPRSLD.ld")
+#Data.fam <- fread(paste0(Data, ".fam"))
+#fwrite(Data.fam[rows_2,1:2], paste0(pathBase, "keep.2.txt"))
+#system(paste0(pathPlink, " --bfile ", Data, " --keep ", pathBase, "keep.2.txt --ld-window-kb 250 --ld-window-r2 0 --out ", path, "PANPRSLD"))
+#plinkLDgenome <- data.table::fread(paste0(pathBase, "PANPRSLD.ld"))
 #Import ours from Mendeley
-plinkLDgenome <- readRDS("PANPRSLD.RDS")
+plinkLDgenome <- readRDS(paste0(path, "PANPRSLD.ld"))
 colnames(plinkLDgenome) <- c("CHR_A", "BP_A",  "SNP_A", "CHR_B", "BP_B",  "SNP_B", "R")
-#The file we provide contains every R2. Only keep the ones >0.2
-plinkLDgenome <- plinkLDgenome[plinkLDgenome$R>0.2]
 
 for (k in 1:20) {
   #---- Simulated data ----
   print(paste0("Simulation ", k))
-  setwd(paste0(path, "Simulation_", k, "/"))
+  setwd(paste0(path, "Simulation_", k, "/Standard/"))
   set.seed(k)
 
   Beta <- readRDS("Beta_simules.Rdata")
@@ -263,7 +300,7 @@ for (k in 1:20) {
 
   #---- MultiLassosum ADAPTIVE (BETA STANDARD) ----
   max_x_lassosumExt <- which.max(x_lassosumExt)
-  AW <- t(MultiLassosum$beta[,c((2*max_x_lassosumExt)-1, 2*max_x_lassosumExt)])
+  AW <- t(out_lassosumExt$beta[,c((2*max_x_lassosumExt)-1, 2*max_x_lassosumExt)])
   AW[1,] <- 1/abs(AW[1,]*weight.2)
   AW[2,] <- 1/abs(AW[2,]*weight.2)
   saveRDS(AW, file =  "BetaMulti/Adaptive_weights.Rdata")
@@ -299,7 +336,6 @@ for (k in 1:20) {
 
   #---- Genetic_cov ----
   cl <- makeCluster(cores[1]-2)
-  #Lambdas ? tester.
   AllLambdas <- c(0.000001, 0.00005, 0.00001, 0.0005, 0.0001, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 5, 10)
 
   out_lassosumGenCov <- multivariateLassosum::lassosum(cor = r, inv_Sb = Sigma_b_snp, inv_Ss = inv_Ss, bfile = Data,
@@ -406,12 +442,12 @@ for (k in 1:20) {
   ## SKZ :
   scaled.beta_estime_SKZ <- as.matrix(Diagonal(x=weight) %*% out_SKZ_lassosum$beta[,which(AllLambdas == Lam)])
   PGS_estime_SKZ <- pgs(Data, keep=parsed.3$keep, weights=scaled.beta_estime_SKZ)
-  saveRDS(PGS_estime_SKZ, file = "OG/PGS_estime_SKZ_", Lam, ".Rdata")
+  saveRDS(PGS_estime_SKZ, file = paste0("OG/PGS_estime_SKZ_", Lam, ".Rdata"))
   
   ## BIP : 
   scaled.beta_estime_BIP <- as.matrix(Diagonal(x=weight) %*% out_BIP_lassosum$beta[,which(AllLambdas == Lam)])
   PGS_estime_BIP <- pgs(Data, keep=parsed.3$keep, weights=scaled.beta_estime_BIP)
-  saveRDS(PGS_estime_BIP, file = "OG/PGS_estime_BIP_", Lam, ".Rdata")
+  saveRDS(PGS_estime_BIP, file = paste0("OG/PGS_estime_BIP_", Lam, ".Rdata"))
   }
 
   #---- PANPRS ----
@@ -440,8 +476,8 @@ for (k in 1:20) {
       tuning <- tuningChr
     }else{
       tuningKeep <- intersect(tuning, tuningChr)
-      tuningCritChr <- which(tuningChr %in% tuningKeep)
-      tuningCrit <- which(tuning %in% tuningKeep)
+      tuningCritChr <- match(tuningChr %in% tuningKeep)
+      tuningCrit <- match(tuning %in% tuningKeep)
       PANPRS$BetaMatrix <- cbind(PANPRS$BetaMatrix[tuningCrit,], PANPRSchr$BetaMatrix[tuningCritChr,])
       PANPRS$tuningMatrix <- PANPRS$tuningMatrix[tuningCrit,]
       tuning <- tuningKeep
@@ -459,7 +495,7 @@ for (k in 1:20) {
   NbrLambdas <- dim(PANPRS$tuningMatrix)[1]
   mat_Beta_SKZ <- PANPRS$BetaMatrix[,whereSKZ]
   mat_Beta_BIP <- PANPRS$BetaMatrix[,whereBIP]
-  array_Beta <- array(c(mat_Beta_SKZ, mat_Beta_BIP), dim = c(dim(mat_Beta_SKZ)[1], dim(mat_Beta_SKZ)[2], 2))
+  array_Beta <- array(c(t(mat_Beta_SKZ), t(mat_Beta_BIP)), dim = c(dim(mat_Beta_SKZ)[2], dim(mat_Beta_SKZ)[1], 2))
   x <- multivariateLassosum::pseudovalidation(r = r.2, keep_sujets = parsed.2$keep, beta = array_Beta, destandardize = FALSE)
   names(x) <- apply(PANPRS$tuningMatrix, 1, FUN = function(x){paste0(round(x,4), collapse = "-")})
   saveRDS(x, file = "PANPRS/Valeurs_f_lambda_PANPRS.Rdata")
@@ -481,21 +517,33 @@ for (k in 1:20) {
   
   #---- LDPRED2 ----
   NCORES <- nb_cores() - 2
-  if(!file.exists(paste0(path, Data, ".rds"))){
-    snp_readBed2(paste0(path, Data, ".bed"),
-                 backingfile = paste0(path, Data, ".rds"),
+  if(!file.exists(paste0(pathBase, Data, ".rds"))){
+    snp_readBed2(paste0(pathBase, Data, ".bed"),
+                 backingfile = paste0(pathBase, Data, ".rds"),
                  ncores = NCORES)
   }
-  obj.bigSNP <- snp_attach(paste0(Data, ".rds"))
+  obj.bigSNP <- snp_attach(paste0(pathBase, ".rds"))
   G   <- obj.bigSNP$genotypes
+  #If ever some missing data remains, LDpred2 wont work:
+  G   <- snp_fastImputeSimple(G, method = "mode", ncores = NCORES)
   CHR <- as.integer(obj.bigSNP$map$chromosome)
   POS <- obj.bigSNP$map$physical.pos
   y   <- obj.bigSNP$fam$affection - 1
   
-  #Correlation computation
-  corr <- snp_cor(G, ind.row = rows_2, ncores = NCORES)
-  tmp <- tempfile(tmpdir = "corr")
-  corr0 <- as_SFBM(corr, tmp)
+  #Correlation computation by chr
+  tmp <- tempfile(tmpdir = paste0(pathBase, "corr"))
+  for (chr in 1:22) {
+    print(chr)
+    ind.chr <- which(CHR == chr)
+    corr <- snp_cor(G, ind.row = rows_2, ncores = NCORES, ind.col = ind.chr)
+    if (chr == 1) {
+      corr0 <- as_SFBM(corr, tmp, compact = TRUE)
+    } else {
+      corr0$add_columns(corr, nrow(corr0))
+    }
+  }
+
+  #Prepare the LDpred2 input
   n_eff_SKZ <- 4 / (1/size_SKZ[1] + 1/size_SKZ[2])
   n_eff_BIP <- 4 / (1/size_BIP[1] + 1/size_BIP[2])
   Beta_se_SKZ <- (1/sqrt(size_SKZ))*(1/sd.1)
@@ -504,13 +552,14 @@ for (k in 1:20) {
   names(df_beta_SKZ) <- c("beta","beta_se","n_eff")
   df_beta_BIP <- cbind(r_BIP_destand, Beta_se_BIP, n_eff_BIP)
   names(df_beta_BIP) <- c("beta","beta_se","n_eff")
+
+  #We chose to test new values of polygenicity, as explain in the original paper.
+  vec_p_init <- c(c(0.0001, 0.0005, 0.001, 0.005, 0.01), seq(0.05, 0.5, length.out = 25))
   
   #LDPRED2 on SKZ
   df_beta_SKZ <- as.data.frame(df_beta_SKZ)
-  ldsc_SKZ <- snp_ldsc2(corr, df_beta_SKZ)
   #We use the heritability value that was fixed in the simulation
-  h2_est_SKZ <- 0.47
-  multi_auto_SKZ <- snp_ldpred2_auto(corr0, df_beta_SKZ, h2_init = h2_est_SKZ, vec_p_init = seq_log(1e-4, 0.5, length.out = 30), ncores = NCORES, sparse = TRUE)
+  multi_auto_SKZ <- snp_ldpred2_auto(corr0, df_beta_SKZ, h2_init = h2_obs_SKZ, vec_p_init, ncores = NCORES, sparse = TRUE)
   saveRDS(multi_auto_SKZ, file = "LDpred2/multi_auto_SKZ.Rdata")
   beta_auto_SKZ_sparse <- sapply(multi_auto_SKZ, function(auto) auto$beta_est_sparse)
   pred_auto_SKZ <- big_prodMat(G, beta_auto_SKZ_sparse, ind.row = rows_3)
@@ -524,10 +573,8 @@ for (k in 1:20) {
   
   #LDPRED2 on BIP
   df_beta_BIP <- as.data.frame(df_beta_BIP)
-  ldsc_BIP <- snp_ldsc2(corr, df_beta_BIP)
   #We use the heritability value that was fixed in the simulation
-  h2_est_BIP <- 0.45
-  multi_auto_BIP <- snp_ldpred2_auto(corr0, df_beta_BIP, h2_init = h2_est_BIP, vec_p_init = seq_log(1e-4, 0.5, length.out = 30), ncores = NCORES, sparse = TRUE)
+  multi_auto_BIP <- snp_ldpred2_auto(corr0, df_beta_BIP, h2_init = h2_obs_BIP, vec_p_init, ncores = NCORES, sparse = TRUE)
   saveRDS(multi_auto_BIP, file = "LDpred2/multi_auto_BIP.Rdata")
   beta_auto_BIP_sparse <- sapply(multi_auto_BIP, function(auto) auto$beta_est_sparse)
   pred_auto_BIP <- big_prodMat(G, beta_auto_BIP_sparse, ind.row = rows_3)
@@ -539,5 +586,4 @@ for (k in 1:20) {
   Beta_BIP_LDpred2 <- final_beta_auto_BIP
   final_pred_auto_BIP <- rowMeans(pred_auto_BIP[, keep])
   saveRDS(final_pred_auto_BIP, file = "LDpred2/PGS_estime_BIP_LDpred2_prodMat.Rdata")
-  
 }
