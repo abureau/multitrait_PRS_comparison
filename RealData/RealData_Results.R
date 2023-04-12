@@ -22,7 +22,6 @@ outColnames <- c("Phenotype", "Methode", "R2", "R2Liab", "AUC", "AUC_lower", "AU
 out2 <- data.frame()
 outColnames2 <- c("Phenotype", "Methode", "Quantile", "OR", "Pvalue", "Upper", "Lower")
 out3 <- data.frame()
-outColnames3 <- c("Phenotype", "Methode", "Quantile", "OR", "Pvalue", "Upper", "Lower")
 
 #This function generates our phenotypes.
 addPheno <- function(omni, GSA, pheno = c("SKZBIP", "BIPavecsans", "SKZaff"), methods, omniOnly = FALSE){
@@ -69,27 +68,27 @@ addPheno <- function(omni, GSA, pheno = c("SKZBIP", "BIPavecsans", "SKZaff"), me
         meriem_prs <- prs
         meriem_prs_SKZ <- prs_SKZ
         meriem_prs_BIP <- prs_BIP
-        prs_SKZ <- data.frame(meriem_prs_SKZ, puce = "Omni")
-        prs_BIP <- data.frame(meriem_prs_BIP, puce = "Omni")
-        prs_SKZ$N_Cas <- sum(prs_SKZ$SKZ == 1)
-        prs_SKZ$N_Temoin <- sum(prs_SKZ$SKZ == 0)
-        prs_BIP$N_Cas <- sum(prs_BIP$BIP == 1)
-        prs_BIP$N_Temoin <- sum(prs_BIP$BIP == 0)
+        out_SKZ <- data.frame(meriem_prs_SKZ, puce = "Omni")
+        out_BIP <- data.frame(meriem_prs_BIP, puce = "Omni")
+        out_SKZ$N_Cas <- sum(out_SKZ$SKZ == 1)
+        out_SKZ$N_Temoin <- sum(out_SKZ$SKZ == 0)
+        out_BIP$N_Cas <- sum(out_BIP$BIP == 1)
+        out_BIP$N_Temoin <- sum(out_BIP$BIP == 0)
       }else{
         gsa_prs <- prs
         gsa_prs_SKZ <- prs_SKZ
         gsa_prs_BIP <- prs_BIP
-        prs_SKZ <- rbind(data.frame(meriem_prs_SKZ, puce = "Omni"),
+        out_SKZ <- rbind(data.frame(meriem_prs_SKZ, puce = "Omni"),
                          data.frame(gsa_prs_SKZ, puce = "GSA"))
-        prs_BIP <- rbind(data.frame(meriem_prs_BIP, puce = "Omni"),
+        out_BIP <- rbind(data.frame(meriem_prs_BIP, puce = "Omni"),
                          data.frame(gsa_prs_BIP, puce = "GSA"))
-        prs_SKZ$N_Cas <- sum(prs_SKZ$SKZ == 1)
-        prs_SKZ$N_Temoin <- sum(prs_SKZ$SKZ == 0)
-        prs_BIP$N_Cas <- sum(prs_BIP$BIP == 1)
-        prs_BIP$N_Temoin <- sum(prs_BIP$BIP == 0)
+        out_SKZ$N_Cas <- sum(out_SKZ$SKZ == 1)
+        out_SKZ$N_Temoin <- sum(out_SKZ$SKZ == 0)
+        out_BIP$N_Cas <- sum(out_BIP$BIP == 1)
+        out_BIP$N_Temoin <- sum(out_BIP$BIP == 0)
       }
     }
-    out <- list("SKZ" = prs_SKZ, "BIP" = prs_BIP)
+    out <- list("SKZ" = out_SKZ, "BIP" = out_BIP)
     
   }else if(pheno == "BIPavecsans"){
     for(i in Loop){
@@ -129,27 +128,27 @@ addPheno <- function(omni, GSA, pheno = c("SKZBIP", "BIPavecsans", "SKZaff"), me
         meriem_prs <- prs
         meriem_prs_BIPavec <- prs_BIPavec
         meriem_prs_BIPsans <- prs_BIPsans
-        prs_BIPavec <- data.frame(meriem_prs_BIPavec, puce = "Omni")
-        prs_BIPsans <- data.frame(meriem_prs_BIPsans, puce = "Omni")
-        prs_BIPavec$N_Temoin <- sum(prs_BIPavec$BIPavec == 0)
-        prs_BIPavec$N_Cas <- sum(prs_BIPavec$BIPavec == 1)
-        prs_BIPsans$N_Temoin <- sum(prs_BIPsans$BIPsans == 0)
-        prs_BIPsans$N_Cas <- sum(prs_BIPsans$BIPsans == 1)
+        out_BIPavec <- data.frame(meriem_prs_BIPavec, puce = "Omni")
+        out_BIPsans <- data.frame(meriem_prs_BIPsans, puce = "Omni")
+        out_BIPavec$N_Temoin <- sum(out_BIPavec$BIPavec == 0)
+        out_BIPavec$N_Cas <- sum(out_BIPavec$BIPavec == 1)
+        out_BIPsans$N_Temoin <- sum(out_BIPsans$BIPsans == 0)
+        out_BIPsans$N_Cas <- sum(out_BIPsans$BIPsans == 1)
       }else{
         gsa_prs <- prs
         gsa_prs_BIPavec <- prs_BIPavec
         gsa_prs_BIPsans <- prs_BIPsans
-        prs_BIPavec <- rbind(data.frame(meriem_prs_BIPavec, puce = "Omni"),
+        out_BIPavec <- rbind(data.frame(meriem_prs_BIPavec, puce = "Omni"),
                              data.frame(gsa_prs_BIPavec, puce = "GSA"))
-        prs_BIPsans <- rbind(data.frame(meriem_prs_BIPsans, puce = "Omni"),
+        out_BIPsans <- rbind(data.frame(meriem_prs_BIPsans, puce = "Omni"),
                              data.frame(gsa_prs_BIPsans, puce = "GSA"))
-        prs_BIPavec$N_Temoin <- sum(prs_BIPavec$BIPavec == 0)
-        prs_BIPavec$N_Cas <- sum(prs_BIPavec$BIPavec == 1)
-        prs_BIPsans$N_Temoin <- sum(prs_BIPsans$BIPsans == 0)
-        prs_BIPsans$N_Cas <- sum(prs_BIPsans$BIPsans == 1)
+        out_BIPavec$N_Temoin <- sum(out_BIPavec$BIPavec == 0)
+        out_BIPavec$N_Cas <- sum(out_BIPavec$BIPavec == 1)
+        out_BIPsans$N_Temoin <- sum(out_BIPsans$BIPsans == 0)
+        out_BIPsans$N_Cas <- sum(out_BIPsans$BIPsans == 1)
       }
     }
-    out <- list("BIPavec" = prs_BIPavec, "BIPsans" = prs_BIPsans)
+    out <- list("BIPavec" = out_BIPavec, "BIPsans" = out_BIPsans)
     
   }else if(pheno == "SKZaff"){
     for(i in Loop){
@@ -165,12 +164,12 @@ addPheno <- function(omni, GSA, pheno = c("SKZBIP", "BIPavecsans", "SKZaff"), me
       rm2 <- data.table::fread(paste0(path_pheno, "BPBroad.pre"))
       rm2 <- rm2$V2[rm2$V6 == 2]
       rm <- union(rm1,rm2)
-      SKZ <- setdiff(GC, rm)
+      SKZaffectif <- setdiff(GC, rm)
       
       #SAD,      omni: 198 sujets (18 cas, 180 temoins)
       #        , gsa :    288 sujets (26 cas, 262 temoins)
       prs$NonAtteint <- ifelse(prs$IID %in% liste_naars_elargie$V1, yes = 1, no = 0)
-      prs$SKZaffectif <- ifelse(prs$IID %in% SKZ, yes = 2, no = 0)
+      prs$SKZaffectif <- ifelse(prs$IID %in% SKZaffectif, yes = 2, no = 0)
       prs$SKZaffectif[prs$NonAtteint == 1] <- 1
       prs$SKZaffectif <- prs$SKZaffectif-1
       prs_SKZaffectif <- prs[prs$SKZaffectif>=0,] %>% dplyr::select(., -NonAtteint)
@@ -192,20 +191,23 @@ addPheno <- function(omni, GSA, pheno = c("SKZBIP", "BIPavecsans", "SKZaff"), me
         gsa_prs <- prs
         gsa_prs_SKZaffectif <- prs_SKZaffectif
         gsa_prs_SKZaffectif <- prs_SKZaffectif
-        prs_SKZaffectif <- rbind(data.frame(meriem_prs_SKZaffectif, puce = "Omni"),
+        out_SKZaffectif <- rbind(data.frame(meriem_prs_SKZaffectif, puce = "Omni"),
                                  data.frame(gsa_prs_SKZaffectif, puce = "GSA"))
-        prs_SKZaffectif <- rbind(data.frame(meriem_prs_SKZaffectif, puce = "Omni"),
-                                 data.frame(gsa_prs_SKZaffectif, puce = "GSA"))
-        prs_SKZaffectif$N_Temoin <- sum(prs_SKZaffectif$SKZaffectif == 0)
-        prs_SKZaffectif$N_Cas <- sum(prs_SKZaffectif$SKZaffectif == 1)
+        out_SKZaffectif$N_Temoin <- sum(out_SKZaffectif$SKZaffectif == 0)
+        out_SKZaffectif$N_Cas <- sum(out_SKZaffectif$SKZaffectif == 1)
       }
     }
-    out <-  prs_SKZaffectif
+    out <-  out_SKZaffectif
   }
   return(out)
 }
 
-#This function computes correlation on a liability scale as proposed by lee et al. 2012
+#This function computes correlation on a liability scale.
+#The code is as presented in 
+#"Lee SH, Goddard ME, Wray NR, Visscher PM. A better coefficient of determination for genetic profile analysis. 
+# Genet Epidemiol. 2012 Apr;36(3):214-24. doi: 10.1002/gepi.21614. PMID: 22714935."
+#Numbers of cases (ncase) and number of controls (ncont) for each phenotype are presented in tables S3 and S4 of this work's original paper.
+#Population prevalence (K) choices are referenced in the respective footnotes of those tables.
 corLiability <- function(lmv, pheno){
   if (pheno == "SKZ")        {K <- 0.01; ncase <- 124}
   if (pheno == "BIP")        {K <- 0.02; ncase <- 205}
@@ -356,7 +358,7 @@ methodsToNames <- function(x){
 }
 
 #---- BIP ET SKZ ----
-#En faire un seul jeu de données de PRS
+#En faire un seul jeu de donn?es de PRS
 prs <- data.frame(omniID, prs_ml_SKZ[, 1], prs_ml_BIP[, 1], prs_ml_SKZ2[, 1], prs_ml_BIP2[, 1],
                   prs_ml_SKZ3[, 1], prs_ml_BIP3[, 1], prs_ml_SKZ4[, 1], prs_ml_BIP4[, 1],
                   prs_ml_SKZ5[, 1], prs_ml_BIP5[, 1], prs_ml_SKZ8[, 1], prs_ml_BIP8[, 1], prs_ml_SKZ9[, 1], prs_ml_BIP9[, 1]
@@ -397,7 +399,7 @@ out3 <- rbind(out3,
 )
 
 #---- BIP with-without psychosis----
-#En faire un seul jeu de données de PRS
+#En faire un seul jeu de donn?es de PRS
 prs <- data.frame(omniID, prs_ml_BIP[, 1], prs_ml_BIP2[, 1],
                   prs_ml_BIP3[, 1], prs_ml_BIP4[, 1],
                   prs_ml_BIP5[, 1], prs_ml_BIP8[, 1], prs_ml_BIP9[, 1]
@@ -424,7 +426,7 @@ out3 <- rbind(out3,
 )
 
 #---- SAD ----
-#En faire un seul jeu de données de PRS
+#En faire un seul jeu de donn?es de PRS
 prs <- data.frame(omniID, prs_ml_SKZ[, 1], prs_ml_SKZ2[, 1],
                   prs_ml_SKZ3[, 1], prs_ml_SKZ4[, 1],
                   prs_ml_SKZ5[, 1], prs_ml_SKZ8[, 1], prs_ml_SKZ9[, 1]
@@ -448,7 +450,7 @@ out3 <- rbind(out3,
 )
 
 #---- BIP with-without psychosis (with SZ PRS) ----
-#En faire un seul jeu de données de PRS
+#En faire un seul jeu de donn?es de PRS
 prs <- data.frame(omniID, prs_ml_SKZ[, 1], prs_ml_SKZ2[, 1],
                   prs_ml_SKZ3[, 1], prs_ml_SKZ4[, 1],
                   prs_ml_SKZ5[, 1], prs_ml_SKZ8[, 1], prs_ml_SKZ9[, 1]
@@ -475,7 +477,7 @@ out3 <- rbind(out3,
 )
 
 #---- SAD (with BD PRS) ----
-#En faire un seul jeu de données de PRS
+#En faire un seul jeu de donn?es de PRS
 prs <- data.frame(omniID, prs_ml_BIP[, 1], prs_ml_BIP2[, 1],
                   prs_ml_BIP3[, 1], prs_ml_BIP4[, 1],
                   prs_ml_BIP5[, 1], prs_ml_BIP8[, 1], prs_ml_BIP9[, 1]

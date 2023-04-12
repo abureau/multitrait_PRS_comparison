@@ -26,10 +26,11 @@ path <- ".../"
 
 #Please specify which kind of scenario you want to simulate.
 #This `for` loop will set the parameters needed for each simulation.
-#Please enter the simulation type. It needs to be written the same ways as it is in the original paper of this project.
+#Please enter the simulation type. It needs to be written the same ways as it is in the original paper of this project:
+#"n = 29,330", "n = 10,139", "n = 29,330; Low Polygenicity", "n = 29,330; Moderate Correlation" or "29300ind_moderateCor/".
 simuType <- "..."
 set.seed(42)
-Data <- paste0(path, "Data_Cartagene")
+DataFile <- paste0(path, "Data_Cartagene")
 
 if(simuType=="n = 29,330"){
   n.1 <- 23330; n.2 <- 26330; nbr_ind <- 29330
@@ -70,7 +71,7 @@ if(simuType=="n = 29,330"){
   warning("Please provide an actual simulation scenario, written as it is in the original paper of this project.")
 }
 
-parsed <- parseselect(Data,extract = NULL, exclude = NULL,keep = NULL, remove = NULL,chr = NULL)
+parsed <- parseselect(DataFile,extract = NULL, exclude = NULL,keep = NULL, remove = NULL,chr = NULL)
 nbr_SNP <- parsed$P
 rho.overlap <- 0
 rows_randomized <- sample(nbr_ind)
@@ -80,9 +81,9 @@ keep.2 <- c(rep(FALSE, nbr_ind))
 keep.2[rows_randomized[(n.1+1):n.2]] <- TRUE
 keep.3 <- c(rep(FALSE, nbr_ind))
 keep.3[rows_randomized[(n.2+1):nbr_ind]] <- TRUE
-parsed.1 <- parseselect(Data, keep = keep.1)
-parsed.2 <- parseselect(Data, keep = keep.2)
-parsed.3 <- parseselect(Data, keep = keep.3)
+parsed.1 <- parseselect(DataFile, keep = keep.1)
+parsed.2 <- parseselect(DataFile, keep = keep.2)
+parsed.3 <- parseselect(DataFile, keep = keep.3)
 rows_1 <- sort(rows_randomized[1:n.1])
 rows_2 <- sort(rows_randomized[(n.1+1):n.2])
 rows_3 <- sort(rows_randomized[(n.2+1):nbr_ind])
@@ -99,7 +100,7 @@ pi2 <- Var_SKZ_beta / sigma2 - pi1
 pi3 <- Var_BIP_beta / sigma2 - pi1
 pi4 <- 1 - pi1 - pi2 - pi3
 prob <- c(pi1, pi2, pi3, pi4)
-#sd.1 <- lassosum:::sd.bfile(bfile = Data,keep=keep.1)
+#sd.1 <- lassosum:::sd.bfile(bfile = DataFile,keep=keep.1)
 #Import the ones we generated  from online 
 sd.1 <- readRDS(paste0(path, "sd.1.RDS"))
 weight <- 1/sd.1
@@ -110,6 +111,8 @@ Var_Y_BIP <- 1
 sd_Y_BIP <- 1
 
 #Function to simulate phenotypes.
+#It is based on the function called snp_simuPheno  from the bigsnpr package:
+#Privé, Florian, et al. "Efficient analysis of large-scale genome-wide data with two R packages: bigstatsr and bigsnpr." Bioinformatics (2018).
 simuPheno <- function(gen_liab, h2, K){
   coeff1 <- sqrt(h2) / stats::sd(gen_liab)
   gen_liab <- (gen_liab * coeff1) - mean(gen_liab * coeff1)
@@ -155,7 +158,7 @@ for (k in 1:20){
 
   #Objects to compute the correlation.
   LDblocks <- "EUR.hg19"
-  ref.bim <- read.table2(paste0(Data, ".bim"))
+  ref.bim <- read.table2(paste0(DataFile, ".bim"))
   LDblocks <- read.table2(system.file(paste0(
     "data/Berisa.",
     LDblocks, ".bed"
@@ -187,11 +190,11 @@ for (k in 1:20){
     region <- c(Blocks$startvec[i]:Blocks$endvec[i])
     extract_region <- rep(FALSE,nbr_SNP)
     extract_region[region] <- TRUE
-    parsed.ref_region <- multivariateLassosum::parseselect(Data, keep = keep.1, extract = extract_region)
+    parsed.ref_region <- multivariateLassosum::parseselect(DataFile, keep = keep.1, extract = extract_region)
     extract2 <- multivariateLassosum::selectregion(!parsed.ref_region$extract)
     extract2[[1]] <- extract2[[1]] - 1
     genotypeMatrix_region <- multivariateLassosum::genotypeMatrix(
-    fileName = paste0(Data, ".bed"), N = parsed.ref_region$N, P = parsed.ref_region$P,
+    fileName = paste0(DataFile, ".bed"), N = parsed.ref_region$N, P = parsed.ref_region$P,
     col_skip_pos = extract2[[1]], col_skip = extract2[[2]],
     keepbytes = keepbytes.1, keepoffset = keepoffset.1, fillmissing = 1
     )
@@ -226,11 +229,11 @@ for (k in 1:20){
     region <- c(Blocks$startvec[i]:Blocks$endvec[i])
     extract_region <- rep(FALSE,nbr_SNP)
     extract_region[region] <- TRUE
-    parsed.ref_region <- multivariateLassosum::parseselect(Data, keep = keep.2, extract = extract_region)
+    parsed.ref_region <- multivariateLassosum::parseselect(DataFile, keep = keep.2, extract = extract_region)
     extract2 <- multivariateLassosum::selectregion(!parsed.ref_region$extract)
     extract2[[1]] <- extract2[[1]] - 1
     genotypeMatrix_region <- multivariateLassosum::genotypeMatrix(
-      fileName = paste0(Data, ".bed"), N = parsed.ref_region$N, P = parsed.ref_region$P,
+      fileName = paste0(DataFile, ".bed"), N = parsed.ref_region$N, P = parsed.ref_region$P,
       col_skip_pos = extract2[[1]], col_skip = extract2[[2]],
       keepbytes = keepbytes.2, keepoffset = keepoffset.2, fillmissing = 1
     )
@@ -264,8 +267,8 @@ for (k in 1:20){
   #Simulated PRSs
   scaled_beta_simule_SKZ <- as.matrix(Diagonal(x=weight) %*% Beta_simule_SKZ)
   scaled_beta_simule_BIP <- as.matrix(Diagonal(x=weight) %*% Beta_simule_BIP)
-  PGS_simule_SKZ <- pgs(Data, keep=parsed.3$keep, weights=scaled_beta_simule_SKZ)
-  PGS_simule_BIP <- pgs(Data, keep=parsed.3$keep, weights=scaled_beta_simule_BIP)
+  PGS_simule_SKZ <- pgs(DataFile, keep=parsed.3$keep, weights=scaled_beta_simule_SKZ)
+  PGS_simule_BIP <- pgs(DataFile, keep=parsed.3$keep, weights=scaled_beta_simule_BIP)
   #Import the ones we generated  from Mendeley 
   #PGS_simule_SKZ <- readRDS(paste0("Standard/PGS_simule_SKZ.Rdata"))
   #PGS_simule_BIP <- readRDS(paste0("Standard/PGS_simule_BIP.Rdata"))

@@ -35,7 +35,8 @@ pathBase <- ".../"
 
 #Please specify which kind of scenario you want to simulate.
 #This `for` loop will set the parameters needed for each simulation.
-#Please enter the simulation type. It needs to be written the same ways as it is in the original paper of this project.
+#Please enter the simulation type. It needs to be written the same ways as it is in the original paper of this project:
+#"n = 29,330", "n = 10,139", "n = 29,330; Low Polygenicity", "n = 29,330; Moderate Correlation" or "29300ind_moderateCor/".
 simuType <- "..."
 set.seed(42)
 
@@ -80,16 +81,16 @@ if(simuType=="n = 29,330"){
 
 if(CaG){
   #Please enter the path to your CARTaGENE data
-  Data <- paste0(pathBase, "...")
-  parsed <- parseselect(Data,extract = NULL, exclude = NULL,keep = NULL, remove = NULL,chr = NULL)
+  DataFile <- paste0(pathBase, "...")
+  parsed <- parseselect(DataFile,extract = NULL, exclude = NULL,keep = NULL, remove = NULL,chr = NULL)
   nbr_SNP <- parsed$P
   rows_randomized <- sample(nbr_ind)
   keep.2 <- c(rep(FALSE, nbr_ind))
   keep.2[rows_randomized[(n.1+1):n.2]] <- TRUE
   keep.3 <- c(rep(FALSE, nbr_ind))
   keep.3[rows_randomized[(n.2+1):nbr_ind]] <- TRUE
-  parsed.2 <- parseselect(Data, keep = keep.2)
-  parsed.3 <- parseselect(Data, keep = keep.3)
+  parsed.2 <- parseselect(DataFile, keep = keep.2)
+  parsed.3 <- parseselect(DataFile, keep = keep.3)
   rows_2 <- sort(rows_randomized[(n.1+1):n.2])
   rows_3 <- sort(rows_randomized[(n.2+1):nbr_ind])
 }else{
@@ -97,17 +98,17 @@ if(CaG){
     warning("This type of simulation cannot be executed using 1000 Genomes data as sample size isn't large enough to uses smaller n.2 and n.3 sizes.")
   }else{
     #In this case, let's divide the 1000 Genomes European data in 2.
-    Data <- paste0(pathBase, "allchrs4")
-    parsed <- parseselect(Data,extract = NULL, exclude = NULL,keep = NULL, remove = NULL,chr = NULL)
-    rm("n.1", "n.2")); nbr_ind <- parsed$N
+    DataFile <- paste0(pathBase, "allchrs4")
+    parsed <- parseselect(DataFile,extract = NULL, exclude = NULL,keep = NULL, remove = NULL,chr = NULL)
+    rm(c("n.1", "n.2")); nbr_ind <- parsed$N
     nbr_SNP <- parsed$P
     rows_randomized <- sample(nbr_ind)
     keep.2 <- c(rep(FALSE, nbr_ind))
     keep.2[rows_randomized[1:floor(nbr_ind/2)]] <- TRUE
     keep.3 <- c(rep(FALSE, nbr_ind))
     keep.3[rows_randomized[(floor(nbr_ind/2)+1):nbr_ind]] <- TRUE
-    parsed.2 <- parseselect(Data, keep = keep.2)
-    parsed.3 <- parseselect(Data, keep = keep.3)
+    parsed.2 <- parseselect(DataFile, keep = keep.2)
+    parsed.3 <- parseselect(DataFile, keep = keep.3)
     rows_2 <- sort(rows_randomized[1:floor(nbr_ind/2)])
     rows_3 <- sort(rows_randomized[(floor(nbr_ind/2)+1):nbr_ind])
   }
@@ -129,13 +130,13 @@ Var_Y_SKZ <- 1
 sd_Y_SKZ <- 1
 Var_Y_BIP <- 1
 sd_Y_BIP <- 1
-#sd.1 <- lassosum:::sd.bfile(bfile = Data,keep=keep.1)
+#sd.1 <- lassosum:::sd.bfile(bfile = DataFile,keep=keep.1)
 #Import the ones we generated  from online 
 sd.1 <- readRDS(paste0(path, "sd.1.RDS"))
-sd.2 <- lassosum:::sd.bfile(bfile = Data, keep=keep.2)
+sd.2 <- lassosum:::sd.bfile(bfile = DataFile, keep=keep.2)
 weight.2 <- 1/sd.2
 weight.2[!is.finite(weight.2)] <- 0
-sd.3 <- lassosum:::sd.bfile(bfile = Data, keep=keep.3)
+sd.3 <- lassosum:::sd.bfile(bfile = DataFile, keep=keep.3)
 weight <- 1/sd.3
 weight[!is.finite(weight)] <- 0
 
@@ -176,9 +177,9 @@ for (j in 1:nbr_SNP) {
 }
 
 #Compute LD matrix using PLINK for PANPRS in the method reference bfiles.
-#Data.fam <- fread(paste0(Data, ".fam"))
+#Data.fam <- fread(paste0(DataFile, ".fam"))
 #fwrite(Data.fam[rows_2,1:2], paste0(pathBase, "keep.2.txt"))
-#system(paste0(pathPlink, " --bfile ", Data, " --keep ", pathBase, "keep.2.txt --ld-window-kb 250 --ld-window-r2 0 --out ", path, "PANPRSLD"))
+#system(paste0(pathPlink, " --bfile ", DataFile, " --keep ", pathBase, "keep.2.txt --ld-window-kb 250 --ld-window-r2 0 --out ", path, "PANPRSLD"))
 #plinkLDgenome <- data.table::fread(paste0(pathBase, "PANPRSLD.ld"))
 #Import ours from Mendeley
 plinkLDgenome <- readRDS(paste0(path, "PANPRSLD.ld"))
@@ -198,7 +199,7 @@ for (k in 1:20) {
   Beta0_simule_BIP <- Beta0[2, ]
 
   LDblocks <- "EUR.hg19"
-  ref.bim <- read.table2(paste0(Data, ".bim"))
+  ref.bim <- read.table2(paste0(DataFile, ".bim"))
   LDblocks <- read.table2(system.file(paste0("data/Berisa.", LDblocks, ".bed"), package = "lassosum"), header = T)
   LDblocks[, 1] <- as.character(sub("chr", "", LDblocks[, 1], ignore.case = T))
   LDblocks <- splitgenome(CHR = ref.bim$V1, POS = ref.bim$V4, ref.CHR = LDblocks[, 1], ref.breaks = LDblocks[, 3])
@@ -237,7 +238,7 @@ for (k in 1:20) {
   #We use the pseudovalidation function from the lassosum package for validation as we're using correlation from the same set as the one
   #used to modelize lassosum. (date set #2)
   cl <- makeCluster(cores[1]-2) 
-  pv_SKZ <- lassosum:::pseudovalidation(Data, beta = BETA_SKZ, cor = r_SKZ.2, keep = parsed.2$keep, sd = sd.2, cluster = cl)
+  pv_SKZ <- lassosum:::pseudovalidation(DataFile, beta = BETA_SKZ, cor = r_SKZ.2, keep = parsed.2$keep, sd = sd.2, cluster = cl)
   stopCluster(cl)
   x_SKZ <- as.vector(pv_SKZ)
   names(x_SKZ) <- as.character(threshold_param)
@@ -252,7 +253,7 @@ for (k in 1:20) {
   #We use the pseudovalidation function from the lassosum package for validation as we're using correlation from the same set as the one
   #used to modelize lassosum. (date set #2)
   cl <- makeCluster(cores[1]-2) 
-  pv_BIP <- lassosum:::pseudovalidation(Data, beta = BETA_BIP, cor = r_BIP.2, keep = parsed.2$keep, sd = sd.2, cluster = cl)
+  pv_BIP <- lassosum:::pseudovalidation(DataFile, beta = BETA_BIP, cor = r_BIP.2, keep = parsed.2$keep, sd = sd.2, cluster = cl)
   stopCluster(cl)
   x_BIP <- as.vector(pv_BIP)
   names(x_BIP) <- as.character(threshold_param)
@@ -261,17 +262,17 @@ for (k in 1:20) {
   #PRS
   for(Lam in threshold_param){
     # SKZ
-    PGS_estime_SKZ <- pgs(Data, keep=parsed.3$keep, weights=BETA_SKZ[,which(threshold_param == Lam)])
+    PGS_estime_SKZ <- pgs(DataFile, keep=parsed.3$keep, weights=BETA_SKZ[,which(threshold_param == Lam)])
     saveRDS(PGS_estime_SKZ, file = paste0("PGS_thresholding_SKZ_", Lam, ".Rdata"))
     # BIP 
-    PGS_estime_BIP <- pgs(Data, keep=parsed.3$keep, weights=BETA_BIP[,which(threshold_param == Lam)])
+    PGS_estime_BIP <- pgs(DataFile, keep=parsed.3$keep, weights=BETA_BIP[,which(threshold_param == Lam)])
     saveRDS(PGS_estime_BIP, file = paste0("PGS_thresholding_BIP_", Lam, ".Rdata"))
   }
 
   #---- MultiLassosum STANDARD ----
   AllLambdas <- c(0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 5, 10)
   cl <- makeCluster(cores[1]-2)  
-  out_lassosumExt <- multivariateLassosum::lassosum(cor = r, inv_Sb = inv_Sb_snp, inv_Ss = inv_Ss, bfile = Data, keep = keep.2,
+  out_lassosumExt <- multivariateLassosum::lassosum(cor = r, inv_Sb = inv_Sb_snp, inv_Ss = inv_Ss, bfile = DataFile, keep = keep.2,
                                                     lambda = AllLambdas, shrink = 0.5, maxiter = 100000, trace = 1, blocks = LDblocks,
                                                     sample_size = sample_size, cluster = cl)
   stopCluster(cl)
@@ -290,11 +291,11 @@ for (k in 1:20) {
   for(Lam in AllLambdas){
     # SKZ
     scaled.beta_estime_SKZ <- as.matrix(Diagonal(x=weight) %*% mat_Beta_SKZ[,which(AllLambdas == Lam)])
-    PGS_estime_SKZ <- pgs(Data, keep=parsed.3$keep, weights=scaled.beta_estime_SKZ)
+    PGS_estime_SKZ <- pgs(DataFile, keep=parsed.3$keep, weights=scaled.beta_estime_SKZ)
     saveRDS(PGS_estime_SKZ, file = paste0("PGS_estime_SKZ_", Lam, ".Rdata"))
     # BIP 
     scaled.beta_estime_BIP <- as.matrix(Diagonal(x=weight) %*% mat_Beta_BIP[,which(AllLambdas == Lam)])
-    PGS_estime_BIP <- pgs(Data, keep=parsed.3$keep, weights=scaled.beta_estime_BIP)
+    PGS_estime_BIP <- pgs(DataFile, keep=parsed.3$keep, weights=scaled.beta_estime_BIP)
     saveRDS(PGS_estime_BIP, file = paste0("PGS_estime_BIP_", Lam, ".Rdata"))
   }
 
@@ -307,7 +308,7 @@ for (k in 1:20) {
 
   AllLambdas <- c(0.0000001, 0.0000005,0.000001, 0.000005, 0.00001, 0.00005, 0.0001)
   cl <- makeCluster(cores[1]-2) 
-  out_lassosumExtAdapBM <- multivariateLassosum::lassosum(cor = r, inv_Sb = inv_Sb_snp, inv_Ss = inv_Ss, bfile = Data, weights = AW,
+  out_lassosumExtAdapBM <- multivariateLassosum::lassosum(cor = r, inv_Sb = inv_Sb_snp, inv_Ss = inv_Ss, bfile = DataFile, weights = AW,
                                                           keep = keep.2, lambda = AllLambdas, shrink = 0.5, maxiter = 100000, trace = 1,
                                                           blocks = LDblocks, sample_size = sample_size, cluster = cl )
   stopCluster(cl)
@@ -326,11 +327,11 @@ for (k in 1:20) {
   for(Lam in AllLambdas){
     # SKZ
     scaled.beta_estime_SKZ <- as.matrix(Diagonal(x=weight) %*% mat_Beta_SKZ[,which(AllLambdas == Lam)])
-    PGS_estime_SKZ <- pgs(Data, keep=parsed.3$keep, weights=scaled.beta_estime_SKZ)
+    PGS_estime_SKZ <- pgs(DataFile, keep=parsed.3$keep, weights=scaled.beta_estime_SKZ)
     saveRDS(PGS_estime_SKZ, file = paste0("BetaMulti/PGS_estime_SKZ_", Lam, ".Rdata"))
     # BIP 
     scaled.beta_estime_BIP <- as.matrix(Diagonal(x=weight) %*% mat_Beta_BIP[,which(AllLambdas == Lam)])
-    PGS_estime_BIP <- pgs(Data, keep=parsed.3$keep, weights=scaled.beta_estime_BIP)
+    PGS_estime_BIP <- pgs(DataFile, keep=parsed.3$keep, weights=scaled.beta_estime_BIP)
     saveRDS(PGS_estime_BIP, file = paste0("BetaMulti/PGS_estime_BIP_", Lam, ".Rdata"))
   }
 
@@ -338,7 +339,7 @@ for (k in 1:20) {
   cl <- makeCluster(cores[1]-2)
   AllLambdas <- c(0.000001, 0.00005, 0.00001, 0.0005, 0.0001, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1, 5, 10)
 
-  out_lassosumGenCov <- multivariateLassosum::lassosum(cor = r, inv_Sb = Sigma_b_snp, inv_Ss = inv_Ss, bfile = Data,
+  out_lassosumGenCov <- multivariateLassosum::lassosum(cor = r, inv_Sb = Sigma_b_snp, inv_Ss = inv_Ss, bfile = DataFile,
                                           keep = keep.2, lambda = AllLambdas, shrink = 0.5, maxiter = 100000, trace = 1,
                                           blocks = LDblocks, sample_size = sample_size, cluster = cl)
   stopCluster(cl)
@@ -357,11 +358,11 @@ for (k in 1:20) {
   for(Lam in AllLambdas){
   ## SKZ :
   scaled.beta_estime_SKZ <- as.matrix(Diagonal(x=weight) %*% mat_Beta_SKZ[,which(AllLambdas == Lam)])
-  PGS_estime_SKZ <- pgs(Data, keep=parsed.3$keep, weights=scaled.beta_estime_SKZ)
+  PGS_estime_SKZ <- pgs(DataFile, keep=parsed.3$keep, weights=scaled.beta_estime_SKZ)
   saveRDS(PGS_estime_SKZ, file = paste0("GenCov/PGS_estime_SKZ_", Lam, ".Rdata"))
   ## BIP : 
   scaled.beta_estime_BIP <- as.matrix(Diagonal(x=weight) %*% mat_Beta_BIP[,which(AllLambdas == Lam)])
-  PGS_estime_BIP <- pgs(Data, keep=parsed.3$keep, weights=scaled.beta_estime_BIP)
+  PGS_estime_BIP <- pgs(DataFile, keep=parsed.3$keep, weights=scaled.beta_estime_BIP)
   saveRDS(PGS_estime_BIP, file = paste0("GenCov/PGS_estime_BIP_", Lam, ".Rdata"))
   }
 
@@ -374,7 +375,7 @@ for (k in 1:20) {
 
   AllLambdas <- c(0.0000001, 0.0000005,0.000001, 0.000005, 0.00001, 0.00005, 0.0001, 0.0005, 0.001, 0.005)
   cl <- makeCluster(cores[1]-2) 
-  out_lassosumExtAdapGenCov <- multivariateLassosum::lassosum(cor = r, inv_Sb = Sigma_b_snp, inv_Ss = inv_Ss, bfile = Data, weights = AW,
+  out_lassosumExtAdapGenCov <- multivariateLassosum::lassosum(cor = r, inv_Sb = Sigma_b_snp, inv_Ss = inv_Ss, bfile = DataFile, weights = AW,
                                                           keep = keep.2, lambda = AllLambdas, shrink = 0.5, maxiter = 100000, trace = 1,
                                                           blocks = LDblocks, sample_size = sample_size, cluster = cl )
   stopCluster(cl)
@@ -393,11 +394,11 @@ for (k in 1:20) {
   for(Lam in AllLambdas){
     # SKZ
     scaled.beta_estime_SKZ <- as.matrix(Diagonal(x=weight) %*% mat_Beta_SKZ[,which(AllLambdas == Lam)])
-    PGS_estime_SKZ <- pgs(Data, keep=parsed.3$keep, weights=scaled.beta_estime_SKZ)
+    PGS_estime_SKZ <- pgs(DataFile, keep=parsed.3$keep, weights=scaled.beta_estime_SKZ)
     saveRDS(PGS_estime_SKZ, file = paste0("BetaGenCov/PGS_estime_SKZ_", Lam, ".Rdata"))
     # BIP 
     scaled.beta_estime_BIP <- as.matrix(Diagonal(x=weight) %*% mat_Beta_BIP[,which(AllLambdas == Lam)])
-    PGS_estime_BIP <- pgs(Data, keep=parsed.3$keep, weights=scaled.beta_estime_BIP)
+    PGS_estime_BIP <- pgs(DataFile, keep=parsed.3$keep, weights=scaled.beta_estime_BIP)
     saveRDS(PGS_estime_BIP, file = paste0("BetaGenCov/PGS_estime_BIP_", Lam, ".Rdata"))
   }
 
@@ -406,14 +407,14 @@ for (k in 1:20) {
 
   #SKZ
   cl <- makeCluster(cores[1]-2) 
-  out_SKZ_lassosum <- lassosum::lassosum(cor = r_SKZ, bfile = Data, keep = keep.2 ,lambda = AllLambdas,shrink = 0.5,
+  out_SKZ_lassosum <- lassosum::lassosum(cor = r_SKZ, bfile = DataFile, keep = keep.2 ,lambda = AllLambdas,shrink = 0.5,
                                          maxiter = 100000, trace = 1, blocks = LDblocks, cluster = cl)
   stopCluster(cl)
   saveRDS(out_SKZ_lassosum, file = "OG/out_SKZ_lassosum_s_0.5.Rdata")
 
   #BIP
   cl <- makeCluster(cores[1]-2) 
-  out_BIP_lassosum<- lassosum::lassosum(cor = r_BIP,bfile = Data, keep = keep.2 ,lambda = AllLambdas, shrink = 0.5,
+  out_BIP_lassosum<- lassosum::lassosum(cor = r_BIP,bfile = DataFile, keep = keep.2 ,lambda = AllLambdas, shrink = 0.5,
                                         maxiter = 100000, trace = 1, blocks = LDblocks,cluster = cl)
   stopCluster(cl)
   saveRDS(out_BIP_lassosum, file = "OG/out_BIP_lassosum_s_0.5.Rdata")
@@ -422,7 +423,7 @@ for (k in 1:20) {
   ##SKZ
   BETA_SKZ <- out_SKZ_lassosum$beta
   cl <- makeCluster(cores[1]-2) 
-  pv_SKZ <- lassosum:::pseudovalidation(Data, beta = BETA_SKZ, cor = r_SKZ.2, keep = parsed.2$keep, sd = sd.2, cluster = cl)
+  pv_SKZ <- lassosum:::pseudovalidation(DataFile, beta = BETA_SKZ, cor = r_SKZ.2, keep = parsed.2$keep, sd = sd.2, cluster = cl)
   stopCluster(cl)
   x_SKZ <- as.vector(pv_SKZ)
   names(x_SKZ) <- as.character(AllLambdas)
@@ -431,7 +432,7 @@ for (k in 1:20) {
   ##BIP
   BETA_BIP <- out_BIP_lassosum$beta
   cl <- makeCluster(cores[1]-2) 
-  pv_BIP <- lassosum:::pseudovalidation(Data, beta = BETA_BIP, cor = r_BIP.2, keep = parsed.2$keep, sd = sd.2, cluster = cl)
+  pv_BIP <- lassosum:::pseudovalidation(DataFile, beta = BETA_BIP, cor = r_BIP.2, keep = parsed.2$keep, sd = sd.2, cluster = cl)
   stopCluster(cl)
   x_BIP <- as.vector(pv_BIP)
   names(x_BIP) <- as.character(AllLambdas)
@@ -441,12 +442,12 @@ for (k in 1:20) {
   for(Lam in AllLambdas){
   ## SKZ :
   scaled.beta_estime_SKZ <- as.matrix(Diagonal(x=weight) %*% out_SKZ_lassosum$beta[,which(AllLambdas == Lam)])
-  PGS_estime_SKZ <- pgs(Data, keep=parsed.3$keep, weights=scaled.beta_estime_SKZ)
+  PGS_estime_SKZ <- pgs(DataFile, keep=parsed.3$keep, weights=scaled.beta_estime_SKZ)
   saveRDS(PGS_estime_SKZ, file = paste0("OG/PGS_estime_SKZ_", Lam, ".Rdata"))
   
   ## BIP : 
   scaled.beta_estime_BIP <- as.matrix(Diagonal(x=weight) %*% out_BIP_lassosum$beta[,which(AllLambdas == Lam)])
-  PGS_estime_BIP <- pgs(Data, keep=parsed.3$keep, weights=scaled.beta_estime_BIP)
+  PGS_estime_BIP <- pgs(DataFile, keep=parsed.3$keep, weights=scaled.beta_estime_BIP)
   saveRDS(PGS_estime_BIP, file = paste0("OG/PGS_estime_BIP_", Lam, ".Rdata"))
   }
 
@@ -507,19 +508,19 @@ for (k in 1:20) {
   for(Lam in AllLambdasLoop){
   # SKZ :
   scaled.beta_estime_SKZ <- as.matrix(t(mat_Beta_SKZ)[,which(AllLambdas == Lam)])
-  PGS_estime_SKZ <- pgs(Data, keep=parsed.3$keep, weights=scaled.beta_estime_SKZ)
+  PGS_estime_SKZ <- pgs(DataFile, keep=parsed.3$keep, weights=scaled.beta_estime_SKZ)
   saveRDS(PGS_estime_SKZ, file = paste0("PANPRS/PGS_estime_SKZ_", Lam, ".Rdata"))
   # BIP : 
   scaled.beta_estime_BIP <- as.matrix(t(mat_Beta_BIP)[,which(AllLambdas == Lam)])
-  PGS_estime_BIP <- pgs(Data, keep=parsed.3$keep, weights=scaled.beta_estime_BIP)
+  PGS_estime_BIP <- pgs(DataFile, keep=parsed.3$keep, weights=scaled.beta_estime_BIP)
   saveRDS(PGS_estime_BIP, file = paste0("PANPRS/PGS_estime_BIP_", Lam, ".Rdata"))
   }
   
   #---- LDPRED2 ----
   NCORES <- nb_cores() - 2
-  if(!file.exists(paste0(pathBase, Data, ".rds"))){
-    snp_readBed2(paste0(pathBase, Data, ".bed"),
-                 backingfile = paste0(pathBase, Data, ".rds"),
+  if(!file.exists(paste0(pathBase, DataFile, ".rds"))){
+    snp_readBed2(paste0(pathBase, DataFile, ".bed"),
+                 backingfile = paste0(pathBase, DataFile, ".rds"),
                  ncores = NCORES)
   }
   obj.bigSNP <- snp_attach(paste0(pathBase, ".rds"))
