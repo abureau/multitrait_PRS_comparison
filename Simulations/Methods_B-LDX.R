@@ -225,6 +225,7 @@ for (k in 1:20) {
     if(which(threshold_param == Lam) == 1) {BETA_SKZ <- data.frame(add) } else {BETA_SKZ <- cbind(BETA_SKZ, add)}
   }
   cl <- makeCluster(cores[1]-2) 
+  # We use the pseudovalidation function for validation as we're using correlation (computed on external data set #2) instead of phenotypes
   pv_SKZ <- lassosum:::pseudovalidation(DataFile, beta = BETA_SKZ, cor = r_SKZ.2, keep = parsed.2$keep, sd = sd.2, cluster = cl)
   stopCluster(cl)
   x_SKZ <- as.vector(pv_SKZ)
@@ -238,6 +239,7 @@ for (k in 1:20) {
     if(which(threshold_param == Lam) == 1) {BETA_BIP <- data.frame(add) } else {BETA_BIP <- cbind(BETA_BIP, add)}
   }
   cl <- makeCluster(cores[1]-2) 
+  # We use the pseudovalidation function for validation as we're using correlation (computed on external data set #2) instead of phenotypes
   pv_BIP <- lassosum:::pseudovalidation(DataFile, beta = BETA_BIP, cor = r_BIP.2, keep = parsed.2$keep, sd = sd.2, cluster = cl)
   stopCluster(cl)
   x_BIP <- as.vector(pv_BIP)
@@ -268,6 +270,7 @@ for (k in 1:20) {
   mat_Beta_SKZ <- out_lassosumExt$beta[,seq(from = 1, to = (NbrLambdas*2)-1, by = 2)]
   mat_Beta_BIP <- out_lassosumExt$beta[,seq(from = 2, to = NbrLambdas*2, by = 2)]
   array_Beta <- array(c(mat_Beta_SKZ, mat_Beta_BIP), dim = c(dim(mat_Beta_SKZ)[1], dim(mat_Beta_SKZ)[2], 2))
+  # We use the pseudovalidation function for validation as we're using correlation (computed on external data set #2) instead of phenotypes
   x_lassosumExt <- multivariateLassosum::pseudovalidation(r = r.2, sd = sd.2, keep_sujets = parsed.2$keep, beta = array_Beta)
   names(x_lassosumExt) <- paste0("lamdba_", AllLambdas)
   saveRDS(x_lassosumExt, file = "Valeurs_f_lambda_LassosumExtension.Rdata")
@@ -299,6 +302,7 @@ for (k in 1:20) {
   mat_Beta_SKZ <- out_lassosumGenCov$beta[,seq(from = 1, to = (NbrLambdas*2)-1, by = 2)]
   mat_Beta_BIP <- out_lassosumGenCov$beta[,seq(from = 2, to = NbrLambdas*2, by = 2)]
   array_Beta <- array(c(mat_Beta_SKZ, mat_Beta_BIP), dim = c(dim(mat_Beta_SKZ)[1], dim(mat_Beta_SKZ)[2], 2))
+  # We use the pseudovalidation function for validation as we're using correlation (computed on external data set #2) instead of phenotypes
   x <- multivariateLassosum::pseudovalidation(r = r.2, sd = sd.2, keep_sujets = parsed.2$keep, beta = array_Beta)
   names(x) <- paste0("lamdba_", AllLambdas)
   saveRDS(x, file = "/BetaMulti/Valeurs_f_lambda_LassosumExtension.Rdata")
@@ -335,6 +339,7 @@ for (k in 1:20) {
   mat_Beta_SKZ <- out_lassosumExtAdapGenCov$beta[,seq(from = 1, to = (NbrLambdas*2)-1, by = 2)]
   mat_Beta_BIP <- out_lassosumExtAdapGenCov$beta[,seq(from = 2, to = NbrLambdas*2, by = 2)]
   array_Beta <- array(c(mat_Beta_SKZ, mat_Beta_BIP), dim = c(dim(mat_Beta_SKZ)[1], dim(mat_Beta_SKZ)[2], 2))
+  # We use the pseudovalidation function for validation as we're using correlation (computed on external data set #2) instead of phenotypes
   x_lassosumGenCov <- multivariateLassosum::pseudovalidation(r = r.2, sd = sd.2, keep_sujets = parsed.2$keep, beta = array_Beta)
   names(x_lassosumGenCov) <- paste0("lamdba_", AllLambdas)
   saveRDS(x_lassosumGenCov, file = "BetaGenCov/Valeurs_f_lambda_LassosumExtension.Rdata")
@@ -371,6 +376,7 @@ for (k in 1:20) {
   mat_Beta_SKZ <- out_lassosumExtAdapBM$beta[,seq(from = 1, to = (NbrLambdas*2)-1, by = 2)]
   mat_Beta_BIP <- out_lassosumExtAdapBM$beta[,seq(from = 2, to = NbrLambdas*2, by = 2)]
   array_Beta <- array(c(mat_Beta_SKZ, mat_Beta_BIP), dim = c(dim(mat_Beta_SKZ)[1], dim(mat_Beta_SKZ)[2], 2))
+  # We use the pseudovalidation function for validation as we're using correlation (computed on external data set #2) instead of phenotypes
   x <- multivariateLassosum::pseudovalidation(r = r.2, sd = sd.2, keep_sujets = parsed.2$keep, beta = array_Beta)
   names(x) <- paste0("lamdba_", AllLambdas)
   saveRDS(x, file = paste0("BetaGenCov/Valeurs_f_lambda_LassosumExtension.Rdata"))
@@ -408,8 +414,7 @@ for (k in 1:20) {
   ##SKZ
   BETA_SKZ <- out_SKZ_lassosum$beta
   cl <- makeCluster(cores[1]-2) 
-  #We use the pseudovalidation function from the lassosum package for validation as we're using correlation from the same set as the one
-  #used to modelize lassosum. (date set #2)
+  # We use the pseudovalidation function for validation as we're using correlation (computed on external data set #2) instead of phenotypes
   pv_SKZ <- lassosum:::pseudovalidation(DataFile, beta = BETA_SKZ, cor = r_SKZ.2, keep = parsed.2$keep, sd = sd.2, cluster = cl)
   stopCluster(cl)
   x_SKZ <- as.vector(pv_SKZ)
@@ -419,8 +424,7 @@ for (k in 1:20) {
   ##BIP
   BETA_BIP <- out_BIP_lassosum$beta
   cl <- makeCluster(cores[1]-2) 
-  #We use the pseudovalidation function from the lassosum package for validation as we're using correlation from the same set as the one
-  #used to modelize lassosum. (date set #2)
+  # We use the pseudovalidation function for validation as we're using correlation (computed on external data set #2) instead of phenotypes
   pv_BIP <- lassosum:::pseudovalidation(DataFile, beta = BETA_BIP, cor = r_BIP.2, keep = parsed.2$keep, sd = sd.2, cluster = cl)
   stopCluster(cl)
   x_BIP <- as.vector(pv_BIP)
@@ -487,6 +491,7 @@ for (k in 1:20) {
   mat_Beta_SKZ <- PANPRS$BetaMatrix[,whereSKZ]
   mat_Beta_BIP <- PANPRS$BetaMatrix[,whereBIP]
   array_Beta <- array(c(t(mat_Beta_SKZ), t(mat_Beta_BIP)), dim = c(dim(mat_Beta_SKZ)[2], dim(mat_Beta_SKZ)[1], 2))
+  # We use the pseudovalidation function for validation as we're using correlation (computed on external data set #2) instead of phenotypes
   x <- multivariateLassosum::pseudovalidation(r = r.2, keep_sujets = parsed.2$keep, beta = array_Beta, destandardize = FALSE)
   names(x) <- apply(PANPRS$tuningMatrix, 1, FUN = function(x){paste0(round(x,4), collapse = "-")})
   saveRDS(x, file = "PANPRS/Valeurs_f_lambda_PANPRS.Rdata")

@@ -262,6 +262,7 @@ NbrLambdas <- dim(PANPRS$tuningMatrix)[1]
 mat_Beta_SKZ <- PANPRS$BetaMatrix[,whereSKZ]
 mat_Beta_BIP <- PANPRS$BetaMatrix[,whereBIP]
 array_Beta <- array(c(t(mat_Beta_SKZ), t(mat_Beta_BIP)), dim = c(dim(mat_Beta_SKZ)[2], dim(mat_Beta_SKZ)[1], 2))
+# We use the pseudovalidation function for validation as we're using correlation (computed using pseudo-summary statistics) instead of phenotypes
 x <- multivariateLassosum::pseudovalidation(r = cbind(corB_SKZ, corB_BIP), keep_sujets = parsed.2$keep, beta = array_Beta, destandardize = FALSE)
 names(x) <- apply(PANPRS$tuningMatrix[DiffZeroCrit,], 1, FUN = function(x){paste0(round(x,4), collapse = "-")})
 saveRDS(x, file = "PANPRS/Results/Valeurs_f_lambda_PANPRS.Rdata")

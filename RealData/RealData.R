@@ -346,6 +346,7 @@ NbrTrait <- length(outMulti$sumstats)
 mat_Beta_SKZ <- outMulti$beta[[NbrS]][,seq(from = 1, to = (NbrLambdas*2)-1, by = 2)]
 mat_Beta_BIP <- outMulti$beta[[NbrS]][,seq(from = 2, to = NbrLambdas*2, by = 2)]
 array_Beta <- array(c(mat_Beta_SKZ, mat_Beta_BIP), dim = c(dim(mat_Beta_SKZ)[1], dim(mat_Beta_SKZ)[2], 2))
+# We use the pseudovalidation function for validation as we're using correlation (computed using pseudo-summary statistics) instead of phenotypes
 xMulti <- multivariateLassosum::pseudovalidation(r = cbind(corB_SKZ, corB_BIP), sd = sdOmni, beta = array_Beta)
 names(xMulti) <- paste0("lamdba_", AllLambdas)
 maxMulti <- which.max(xMulti)
@@ -390,6 +391,7 @@ NbrLambdas <- length(outMultiGenCov$lambda)
 mat_Beta_SKZ <- outMultiGenCov$beta[[1]][,seq(from = 1, to = (NbrLambdas*2)-1, by = 2)]
 mat_Beta_BIP <- outMultiGenCov$beta[[1]][,seq(from = 2, to = NbrLambdas*2, by = 2)]
 array_Beta <- array(c(mat_Beta_SKZ, mat_Beta_BIP), dim = c(dim(mat_Beta_SKZ)[1], dim(mat_Beta_SKZ)[2], 2))
+# We use the pseudovalidation function for validation as we're using correlation (computed using pseudo-summary statistics) instead of phenotypes
 xMultiGenCov <- multivariateLassosum::pseudovalidation(r = cbind(corB_SKZ, corB_BIP), sd = sdOmni, beta = array_Beta)
 names(xMultiGenCov) <- paste0("lamdba_", AllLambdas)
 maxMultiGenCov <- which.max(xMultiGenCov)
@@ -439,6 +441,7 @@ saveRDS(OGBIP, file = "Results/OGBIP.RDS")
 #SKZ Validation
 BETA_SKZ <- OGSKZ$beta
 cl <- makeCluster(ncores[1]-5) 
+# We use the pseudovalidation function for validation as we're using correlation (computed using pseudo-summary statistics) instead of phenotypes
 xOGSKZ <- lassosum:::pseudovalidation(bfile = omni, beta = BETA_SKZ[[1]], cor = corB_SKZ, sd = sdOmni, cluster = cl)
 stopCluster(cl)
 xOGSKZ <- as.vector(xOGSKZ)
@@ -449,6 +452,7 @@ saveRDS(xOGSKZ, file = "Results/OGSKZFlambda.RDS")
 #BIP Validation
 BETA_BIP <- OGBIP$beta
 cl <- makeCluster(ncores[1]-5) 
+# We use the pseudovalidation function for validation as we're using correlation (computed using pseudo-summary statistics) instead of phenotypes
 xOGBIP <- lassosum:::pseudovalidation(bfile = omni, beta = BETA_BIP[[1]], cor = corB_BIP, sd = sdOmni, cluster = cl)
 stopCluster(cl)
 xOGBIP <- as.vector(xOGBIP)
