@@ -305,27 +305,6 @@ for (j in 1:nbr_SNP) {
   phenotypic.genetic.Var.Cov.matrix[,,j] <- matrix(data = c(bySNP*totalMatrix[1,1], bySNP*totalMatrix[1,2], bySNP*totalMatrix[2,1], bySNP*totalMatrix[2,2]), nrow = 2, ncol = 2)
 }
 
-#---- Thresholding ----
-#Thresholds are fixed using Trubetskoy (2022) and Mullins (2021) recommendations for, respectively, SZ and BP.
-betaSKZ <- log(ss_SKZ$OR)
-betaBIP <- ss_BIP$BETA
-betaSKZ[ss_SKZ$P > 0.05] <- 0
-betaBIP[ss_BIP$PVAL > 0.10] <- 0
-PRSthresholdGSASKZ <- pgs(GSA, weights=betaSKZ)
-PRSthresholdGSABIP <- pgs(GSA, weights=betaBIP)
-saveRDS(PRSthresholdGSASKZ, file = "Results/ThresholdingGSASKZ.RDS")
-saveRDS(PRSthresholdGSABIP, file = "Results/ThresholdingGSABIP.RDS")
-
-betaSKZ<- log(ss_SKZ$OR)
-betaBIP <- ss_BIP$BETA
-betaSKZ[ss_SKZ$P > 0.05] <- 0
-betaBIP[ss_BIP$PVAL > 0.10] <- 0
-PRSthresholdOmniSKZ <- pgs(omni, weights=betaSKZ)
-PRSthresholdOmniBIP <- pgs(omni, weights=betaBIP)
-saveRDS(PRSthresholdOmniSKZ, file = "Results/ThresholdingOmniSKZ.RDS")
-saveRDS(PRSthresholdOmniBIP, file = "Results/ThresholdingOmniBIP.RDS")
-
-
 #---- multivariateLassosum STANDARD ----
 cl<-makeCluster(ncores[1]-5)
 AllLambdas <- exp(seq(from = log(1e-2), to = log(2500), length.out = 20))
@@ -347,33 +326,46 @@ mat_Beta_SKZ <- outMulti$beta[[NbrS]][,seq(from = 1, to = (NbrLambdas*2)-1, by =
 mat_Beta_BIP <- outMulti$beta[[NbrS]][,seq(from = 2, to = NbrLambdas*2, by = 2)]
 array_Beta <- array(c(mat_Beta_SKZ, mat_Beta_BIP), dim = c(dim(mat_Beta_SKZ)[1], dim(mat_Beta_SKZ)[2], 2))
 # We use the pseudovalidation function for validation as we're using correlation (computed using pseudo-summary statistics) instead of phenotypes
-xMulti <- multivariateLassosum::pseudovalidation(r = cbind(corB_SKZ, corB_BIP), sd = sdOmni, beta = array_Beta)
+xMulti <- multivariateLassosum::pseudovalidation(omni, r = cbind(corB_SKZ, corB_BIP), sd = sdOmni, beta = array_Beta)
 names(xMulti) <- paste0("lamdba_", AllLambdas)
 maxMulti <- which.max(xMulti)
 saveRDS(xMulti, file = "Results/multiFlambda.RDS")
 
+#Final model on real sumstats
+cl<-makeCluster(ncores[1]-5)
+outMulti <- lassosum.pipeline(cor = list(cor_SKZ,cor_BIP),
+                              phenotypic.genetic.Var.Cov.matrix = phenotypic.genetic.Var.Cov.matrix,
+                              Var.phenotypic = Var.phenotypic, chr = list(ss_SKZ$CHR,ss_BIP$CHR),
+                              pos = list(ss_SKZ$BP,ss_BIP$POS), cluster = cl,
+                              A1 =  list(ss_SKZ$A1,ss_BIP$A1), A2 = list(ss_SKZ$A2,ss_BIP$A2),
+                              ref.bfile = testOmni.bfile, LDblocks = LDblocks,
+                              lambda = AllLambdas[maxMulti], s = 0.5, sample_size = c(size_SKZ, size_BIP))
+stopCluster(cl)
+BETA_SKZ <- outMulti$beta$`0.5`[,1]
+BETA_BIP <- outMulti$beta$`0.5`[,2]
+
+
 #PRS (OmniExpress data set)
-Lam <- AllLambdas[maxMulti]
 # SKZ
-scaled.beta_estime_SKZ <- as.matrix(Diagonal(x=weightOmni) %*% (mat_Beta_SKZ[,which(AllLambdas == Lam)]))
+scaled.beta_estime_SKZ <- as.matrix(weightOmni*BETA_SKZ)
 PGS_estime_SKZ <- pgs(omni, weights=scaled.beta_estime_SKZ)
-saveRDS(PGS_estime_SKZ, file = paste0("Results/multiOmniSKZ_", Lam, ".RDS"))
+saveRDS(PGS_estime_SKZ, file = paste0("Results/multiOmniSKZ.RDS"))
 # BIP 
-scaled.beta_estime_BIP <- as.matrix(Diagonal(x=weightOmni) %*% (mat_Beta_BIP[,which(AllLambdas == Lam)]))
+scaled.beta_estime_BIP <- as.matrix(weightOmni*BETA_BIP)
 PGS_estime_BIP <- pgs(omni, weights=scaled.beta_estime_BIP)
-saveRDS(PGS_estime_BIP, file = paste0("Results/multiOmniBIP_", Lam, ".RDS"))
+saveRDS(PGS_estime_BIP, file = paste0("Results/multiOmniBIP.RDS"))
 
 #PRS (GSA data set)
 # SKZ
-scaled.beta_estime_SKZ <- as.matrix(Diagonal(x=weightGSA) %*% (mat_Beta_SKZ[,which(AllLambdas == Lam)]))
+scaled.beta_estime_SKZ <- as.matrix(weightGSA*BETA_SKZ)
 PGS_estime_SKZ <- pgs(GSA, weights=scaled.beta_estime_SKZ)
-saveRDS(PGS_estime_SKZ, file = paste0("Results/multiGSASKZ_", Lam, ".RDS"))
+saveRDS(PGS_estime_SKZ, file = paste0("Results/multiGSASKZ.RDS"))
 # BIP 
-scaled.beta_estime_BIP <- as.matrix(Diagonal(x=weightGSA) %*% (mat_Beta_BIP[,which(AllLambdas == Lam)]))
+scaled.beta_estime_BIP <- as.matrix(weightGSA*BETA_BIP)
 PGS_estime_BIP <- pgs(GSA, weights=scaled.beta_estime_BIP)
-saveRDS(PGS_estime_BIP, file = paste0("Results/multiGSABIP_", Lam, ".RDS"))
+saveRDS(PGS_estime_BIP, file = paste0("Results/multiGSABIP.RDS"))
 
-#---- Genetic_cov ----
+#---- multivariateLassosum B-LDX ----
 cl<-makeCluster(ncores[1]-5)
 AllLambdas <- exp(seq(from = log(1e-2), to = log(2500), length.out = 20))
 outMultiGenCov <- lassosum.pipeline(cor = list(corA_SKZ,corA_BIP),
@@ -392,51 +384,61 @@ mat_Beta_SKZ <- outMultiGenCov$beta[[1]][,seq(from = 1, to = (NbrLambdas*2)-1, b
 mat_Beta_BIP <- outMultiGenCov$beta[[1]][,seq(from = 2, to = NbrLambdas*2, by = 2)]
 array_Beta <- array(c(mat_Beta_SKZ, mat_Beta_BIP), dim = c(dim(mat_Beta_SKZ)[1], dim(mat_Beta_SKZ)[2], 2))
 # We use the pseudovalidation function for validation as we're using correlation (computed using pseudo-summary statistics) instead of phenotypes
-xMultiGenCov <- multivariateLassosum::pseudovalidation(r = cbind(corB_SKZ, corB_BIP), sd = sdOmni, beta = array_Beta)
+xMultiGenCov <- multivariateLassosum::pseudovalidation(omni, r = cbind(corB_SKZ, corB_BIP), sd = sdOmni, beta = array_Beta)
 names(xMultiGenCov) <- paste0("lamdba_", AllLambdas)
 maxMultiGenCov <- which.max(xMultiGenCov)
 saveRDS(xMultiGenCov, file = paste0("Results/multiGenCovFlambda.RDS"))
 
+#Final model on real sumstats
+cl<-makeCluster(ncores[1]-5)
+outMultiGenCov <- lassosum.pipeline(cor = list(cor_SKZ,cor_BIP),
+                                    phenotypic.genetic.Var.Cov.matrix = phenotypic.genetic.Var.Cov.matrix.gencov,
+                                    Var.phenotypic = Var.phenotypic, chr = list(ss_SKZ$CHR,ss_BIP$CHR),
+                                    pos = list(ss_SKZ$BP,ss_BIP$POS), cluster = cl,
+                                    A1 =  list(ss_SKZ$A1,ss_BIP$A1), A2 = list(ss_SKZ$A2,ss_BIP$A2),
+                                    ref.bfile = testOmni.bfile, LDblocks = LDblocks, 
+                                    lambda = AllLambdas[maxMultiGenCov], s = 0.5, sample_size = c(size_SKZ, size_BIP))
+stopCluster(cl)
+BETA_SKZ <- outMultiGenCov$beta$`0.5`[,1]
+BETA_BIP <- outMultiGenCov$beta$`0.5`[,2]
+
 #PRS (OmniExpress data set)
-Lam <- AllLambdas[maxMultiGenCov]
 # SKZ
-scaled.beta_estime_SKZ <- as.matrix(Diagonal(x=weightOmni) %*% (mat_Beta_SKZ[,which(AllLambdas == Lam)]))
+scaled.beta_estime_SKZ <- as.matrix(weightOmni*BETA_SKZ)
 PGS_estime_SKZ <- pgs(omni, weights=scaled.beta_estime_SKZ)
-saveRDS(PGS_estime_SKZ, file = paste0("Results/multiGenCovOmniSKZ_", Lam, ".RDS"))
+saveRDS(PGS_estime_SKZ, file = paste0("Results/multiGenCovOmniSKZ.RDS"))
 # BIP 
-scaled.beta_estime_BIP <- as.matrix(Diagonal(x=weightOmni) %*% (mat_Beta_BIP[,which(AllLambdas == Lam)]))
+scaled.beta_estime_BIP <- as.matrix(weightOmni*BETA_BIP)
 PGS_estime_BIP <- pgs(omni, weights=scaled.beta_estime_BIP)
-saveRDS(PGS_estime_BIP, file = paste0("Results/multiGenCovOmniBIP_", Lam, ".RDS"))
+saveRDS(PGS_estime_BIP, file = paste0("Results/multiGenCovOmniBIP.RDS"))
 
 #PRS (GSA data set)
 # SKZ
-scaled.beta_estime_SKZ <- as.matrix(Diagonal(x=weightGSA) %*% (mat_Beta_SKZ[,which(AllLambdas == Lam)]))
+scaled.beta_estime_SKZ <- as.matrix(weightGSA*BETA_SKZ)
 PGS_estime_SKZ <- pgs(GSA, weights=scaled.beta_estime_SKZ)
-saveRDS(PGS_estime_SKZ, file = paste0("Results/multiGenCovGSASKZ_", Lam, ".RDS"))
+saveRDS(PGS_estime_SKZ, file = paste0("Results/multiGenCovGSASKZ.RDS"))
 # BIP 
-scaled.beta_estime_BIP <- as.matrix(Diagonal(x=weightGSA) %*% (mat_Beta_BIP[,which(AllLambdas == Lam)]))
+scaled.beta_estime_BIP <- as.matrix(weightGSA*BETA_BIP)
 PGS_estime_BIP <- pgs(GSA, weights=scaled.beta_estime_BIP)
-saveRDS(PGS_estime_BIP, file = paste0("Results/multiGenCovGSABIP_", Lam, ".RDS"))
+saveRDS(PGS_estime_BIP, file = paste0("Results/multiGenCovGSABIP.RDS"))
 
-#---- LASSOSUM ----
+#---- Lassosum ----
 cl <- makeCluster(ncores[1]-5) 
 #We are using the lambdas proposed by the authors.
 AllLambdas <- exp(seq(log(0.001), log(0.1), length.out = 20))
 
 #Lassosum for SKZ
-OGSKZ <- lassosum::lassosum.pipeline(cor = corA_SKZ, ref.bfile = omni, lambda = AllLambdas, #test.bfile = testGSA.file, destandardize = FALSE,
+OGSKZ <- lassosum::lassosum.pipeline(cor = corA_SKZ, ref.bfile = omni, lambda = AllLambdas,
 		              chr = ssA_SKZ$CHR, pos = ssA_SKZ$BP, A1 = ssA_SKZ$A1, A2 = ssA_SKZ$A2, s = 0.5,
                               trace = 1, LDblocks = LDblocks, cluster = cl)
 stopCluster(cl)
-saveRDS(OGSKZ, file = "Results/OGSKZ.RDS")
 
 #Lassosum for BIP
 cl <- makeCluster(ncores[1]-5) 
-OGBIP <- lassosum::lassosum.pipeline(cor = corA_BIP, ref.bfile = omni, lambda = AllLambdas, #test.bfile = testGSA.file, destandardize = FALSE,
+OGBIP <- lassosum::lassosum.pipeline(cor = corA_BIP, ref.bfile = omni, lambda = AllLambdas,
 		              chr = ssA_BIP$CHR, pos = ssA_BIP$POS, A1 = ssA_BIP$A1, A2 = ssA_BIP$A2, s = 0.5,
                               trace = 1, LDblocks = LDblocks, cluster = cl)
 stopCluster(cl)
-saveRDS(OGBIP, file = "Results/OGBIP.RDS")
 
 #SKZ Validation
 BETA_SKZ <- OGSKZ$beta
@@ -449,6 +451,15 @@ names(xOGSKZ) <- as.character(AllLambdas)
 maxOGSKZ <- which.max(xOGSKZ)
 saveRDS(xOGSKZ, file = "Results/OGSKZFlambda.RDS")
 
+#Final model
+cl<-makeCluster(ncores[1]-5)
+OGSKZ <- lassosum::lassosum.pipeline(cor = cor_SKZ, ref.bfile = testOmni.bfile, lambda = AllLambdas[maxOGSKZ],
+                                     chr = ss_SKZ$CHR, pos = ss_SKZ$BP, A1 = ss_SKZ$A1, A2 = ss_SKZ$A2, s = 0.5,
+                                     trace = 1, LDblocks = LDblocks, cluster = cl)
+stopCluster(cl)
+saveRDS(OGBIP, file = "Results/OGSKZ.RDS")
+BETA_SKZ <- OGSKZ$beta
+
 #BIP Validation
 BETA_BIP <- OGBIP$beta
 cl <- makeCluster(ncores[1]-5) 
@@ -460,31 +471,39 @@ names(xOGBIP) <- as.character(AllLambdas)
 maxOGBIP <- which.max(xOGBIP)
 saveRDS(xOGBIP, file = "Results/OGBIPFlambda.RDS")
   
-#PRS (OmniExpress data set)
+#Final model
+cl <- makeCluster(ncores[1]-5) 
+OGBIP <- lassosum::lassosum.pipeline(cor = cor_BIP, ref.bfile = testOmni.bfile, lambda = AllLambdas[maxOGBIP],
+                                     chr = ss_BIP$CHR, pos = ss_BIP$BP, A1 = ss_BIP$A1, A2 = ss_BIP$A2, s = 0.5,
+                                     trace = 1, LDblocks = LDblocks, cluster = cl)
+stopCluster(cl)
+saveRDS(OGBIP, file = "Results/OGBIP.RDS")
+BETA_BIP <- OGBIP$beta
+
+#PRS Omni
+#On destandardise avec le sd du jeu de test respectif
 # SKZ
-Lam <- AllLambdas[maxOGSKZ]
-scaled.beta_estime_SKZ <- as.matrix(Diagonal(x=weightOmni) %*% (BETA_SKZ[[1]][,which(AllLambdas == Lam)]))
+scaled.beta_estime_SKZ <- as.matrix(weightOmni*BETA_SKZ)
 PGS_estime_SKZ <- pgs(omni, weights=scaled.beta_estime_SKZ)
-saveRDS(PGS_estime_SKZ, file = paste0("Results/OGOmniSKZ_", Lam, ".RDS"))
+saveRDS(PGS_estime_SKZ, file = paste0("Results/OGOmniSKZ.RDS"))
 # BIP 
-Lam <- AllLambdas[maxOGBIP]
-scaled.beta_estime_BIP <- as.matrix(Diagonal(x=weightOmni) %*% (BETA_BIP[[1]][,which(AllLambdas == Lam)]))
-PGS_estime_BIP <- pgs(omni, weights=scaled.beta_estime_BIP)
-saveRDS(PGS_estime_BIP, file = paste0("Results/OGOmniBIP_", Lam, ".RDS"))
+scaled.beta_estime_BIP <- as.matrix(weightOmni*BETA_BIP)
+PGS_estime_BIP <- pgs(omni, weights=scaled.beta_estime_BIP )
+saveRDS(PGS_estime_BIP, file = paste0("Results/OGOmniBIP.RDS"))
 
-#PRS (GSA data set)
+#On destandardise avec le sd du jeu de test respectif
+#PRS GSA
 # SKZ
-Lam <- AllLambdas[maxOGSKZ]
-scaled.beta_estime_SKZ <- as.matrix(Diagonal(x=weightGSA) %*% (BETA_SKZ[[1]][,which(AllLambdas == Lam)]))
+scaled.beta_estime_SKZ <- as.matrix(weightGSA*BETA_SKZ)
 PGS_estime_SKZ <- pgs(GSA, weights=scaled.beta_estime_SKZ)
-saveRDS(PGS_estime_SKZ, file = paste0("Results/OGGSASKZ_", Lam, ".RDS"))
+saveRDS(PGS_estime_SKZ, file = paste0("Results/OGGSASKZ.RDS"))
 # BIP 
-Lam <- AllLambdas[maxOGBIP]
-scaled.beta_estime_BIP <- as.matrix(Diagonal(x=weightGSA) %*% (BETA_BIP[[1]][,which(AllLambdas == Lam)]))
+scaled.beta_estime_BIP <- as.matrix(weightGSA*BETA_BIP)
 PGS_estime_BIP <- pgs(GSA, weights=scaled.beta_estime_BIP)
-saveRDS(PGS_estime_BIP, file = paste0("Results/OGGSABIP_", Lam, ".RDS"))
+saveRDS(PGS_estime_BIP, file = paste0("Results/OGGSABIP.RDS"))
 
-#---- Clumping and thresholding ----
+
+#---- thresholding and Clumping + thresholding ----
 #To avoid parallelism issues
 options(bigstatsr.check.parallel.blas = FALSE)
 
@@ -513,7 +532,70 @@ CHRGSA <- as.integer(obj.bigSNPGSA$map$chromosome)
 POSGSA <- obj.bigSNPGSA$map$physical.pos
 
 #Let's use the sumstats format that the bigsnpr authors demands.
-#Here we use the real sumstats, same as the thresholding method.
+#Here we use the sumstats A.
+ss_SKZCT <- setNames(ssA_SKZ[,c("CHR", "SNP", "BP", "A1", "A2", "beta", "P")], c("chr", "rsid", "pos", "a0", "a1", "beta", "p"))
+ss_BIPCT <- setNames(ssA_BIP[,c("CHR", "ID", "POS", "A1", "A2", "beta", "PVAL")], c("chr", "rsid", "pos", "a0", "a1", "beta", "p"))
+map <- setNames(obj.bigSNPOmni$map[,-(2:3)], c("chr", "pos", "a0", "a1"))
+info_snpSKZ <- snp_match(ss_SKZCT, map)
+lpSSKZ <- -log10(info_snpSKZ$p)
+info_snpBIP <- snp_match(ss_BIPCT, map)
+lpSBIP <- -log10(info_snpBIP$p)
+
+
+#Thresholding
+p <- data.frame(p = c(1e-4, 0.001, seq(from = 0.5, to = 1, length.out = 20)))
+array_BetaSKZ <- array(NA, dim = c(nrow(info_snpSKZ), nrow(p), 1))
+array_BetaBIP <- array(NA, dim = c(nrow(info_snpBIP), nrow(p), 1))
+for(t in p$p){
+  ind.keepSKZ <- which(info_snpSKZ$p < t)
+  betaSKZ_t <- rep(0, nrow(info_snpSKZ))
+  betaSKZ_t[ind.keepSKZ] <- info_snpSKZ$beta[ind.keepSKZ]
+  idx <- which(p$p == t)
+  array_BetaSKZ[,idx,1] <- betaSKZ_t
+  
+  ind.keepBIP <- which(info_snpBIP$p < t)
+  betaBIP_t <- rep(0, nrow(info_snpBIP))
+  betaBIP_t[ind.keepBIP] <- info_snpBIP$beta[ind.keepBIP]
+  array_BetaBIP[,idx,1] <- betaBIP_t
+}
+p$xSKZ <- multivariateLassosum::pseudovalidation(omni, beta = array_BetaSKZ, cor = cbind(corB_SKZ), destandardize = FALSE)
+xt.max_SKZ <- which.max(p$xSKZ)
+p$xBIP <- multivariateLassosum::pseudovalidation(omni, beta = array_BetaBIP, cor = cbind(corB_BIP), destandardize = FALSE)
+xt.max_BIP <- which.max(p$xBIP)
+saveRDS(p, file = "Results/T_flambda.RDS")
+
+
+#Clumping + thresholding
+p2 <- c(1e-4, 0.001, seq(from = 0.5, to = 1, length.out = 20))
+r2 <- c(0.01, 0.05, 0.1, 0.2, 0.5, 0.8, 0.95)
+pr2 <- data.frame(r2 = rep(r2, each = length(p2)), p = p2)
+array_BetaSKZ <- array(NA, dim = c(nrow(info_snpSKZ), nrow(pr2), 1))
+array_BetaBIP <- array(NA, dim = c(nrow(info_snpBIP), nrow(pr2), 1))
+for(c in r2){
+  ind.keepSKZ_c <- snp_clumping(GOmni, infos.chr = info_snpSKZ$chr, S = lpSSKZ, thr.r2 = c, size = 250, infos.pos = info_snpSKZ$pos, ncores = ncores)
+  ind.keepBIP_c <- snp_clumping(GOmni, infos.chr = info_snpBIP$chr, S = lpSBIP, thr.r2 = c, size = 250, infos.pos = info_snpBIP$pos, ncores = ncores)
+  for(t in p2){
+    ind.keepSKZ_t <- which(info_snpSKZ$p < t)
+    ind.keepSKZ <- intersect(ind.keepSKZ_c, ind.keepSKZ_t)
+    betaSKZ_ct <- rep(0, nrow(info_snpSKZ))
+    betaSKZ_ct[ind.keepSKZ] <- info_snpSKZ$beta[ind.keepSKZ]
+    idx <- which(pr2$r2 == c & pr2$p == t)
+    array_BetaSKZ[,idx,1] <- betaSKZ_ct
+    
+    ind.keepBIP_t <- which(info_snpBIP$p < t)
+    ind.keepBIP <- intersect(ind.keepBIP_c, ind.keepBIP_t)
+    betaBIP_ct <- rep(0, nrow(info_snpBIP))
+    betaBIP_ct[ind.keepBIP] <- info_snpBIP$beta[ind.keepBIP]
+    array_BetaBIP[,idx,1] <- betaBIP_ct
+  }
+}
+pr2$xSKZ <- multivariateLassosum::pseudovalidation(omni, beta = array_BetaSKZ, cor = cbind(corB_SKZ), destandardize = FALSE)
+x.max_SKZ <- which.max(pr2$xSKZ)
+pr2$xBIP <- multivariateLassosum::pseudovalidation(omni, beta = array_BetaBIP, cor = cbind(corB_BIP), destandardize = FALSE)
+x.max_BIP <- which.max(pr2$xBIP)
+saveRDS(pr2, file = "Results/CT_flambda_plus.RDS")
+
+#Here we use the real sumstats to run the final model
 ss_SKZCT <- setNames(ss_SKZ[,c("CHR", "SNP", "BP", "A1", "A2", "OR", "P")], c("chr", "rsid", "pos", "a0", "a1", "beta", "p"))
 ss_SKZCT$beta <- log(ss_SKZCT$beta)
 ss_BIPCT <- setNames(ss_BIP[,c("CHR", "ID", "POS", "A1", "A2", "BETA", "PVAL")], c("chr", "rsid", "pos", "a0", "a1", "beta", "p"))
@@ -523,25 +605,41 @@ lpSSKZ <- -log10(info_snpSKZ$p)
 info_snpBIP <- snp_match(ss_BIPCT, map)
 lpSBIP <- -log10(info_snpBIP$p)
 
-#Clumping
-#Thresholds are fixed using Trubetskoy (2022) and Mullins (2021) recommendations for, respectively, SZ and BP.
-ind.keepSKZ <- snp_clumping(GOmni, infos.chr = info_snpSKZ$chr, S = info_snpSKZ$p, thr.r2 = 0.5, size = 250, infos.pos = info_snpSKZ$pos, ncores = NCORES)
-ind.keepBIP <- snp_clumping(GOmni, infos.chr = info_snpBIP$chr, S = info_snpBIP$p, thr.r2 = 0.5, size = 250, infos.pos = info_snpBIP$pos, ncores = NCORES)
+#Thresholding
+# PRS (OmniExpress data set)
+#SKZ
+prs <- snp_PRS(GOmni, betas.keep = info_snpSKZ$beta, lpS.keep = lpSSKZ, thr.list = -log10(p$p[xt.max_SKZ]))
+saveRDS(prs, file = paste0("Results/ThresholdingOmniSKZ.RDS"))
+#BIP
+prs <- snp_PRS(GOmni, betas.keep = info_snpBIP$beta, lpS.keep = lpSBIP, thr.list = -log10(p$p[xt.max_BIP]))
+saveRDS(prs, file = paste0("Results/ThresholdingOmniBIP.RDS"))
+
+# PRS (GSA data set)
+#SKZ
+prs <- snp_PRS(GGSA, betas.keep = info_snpSKZ$beta, lpS.keep = lpSSKZ, thr.list = -log10(p$p[xt.max_SKZ]))
+saveRDS(prs, file = paste0("Results/ThresholdingGSASKZ.RDS"))
+#BIP
+prs <- snp_PRS(GGSA, betas.keep = info_snpBIP$beta, lpS.keep = lpSBIP, thr.list = -log10(p$p[xt.max_BIP]))
+saveRDS(prs, file = paste0("Results/ThresholdingGSABIP.RDS"))
+
+#Clumping + thresholding
+ind.keepSKZ <- snp_clumping(GOmni, infos.chr = info_snpSKZ$chr, S = lpSSKZ, thr.r2 = pr2$r2[x.max_SKZ], size = 250, infos.pos = info_snpSKZ$pos, ncores = ncores)
+ind.keepBIP <- snp_clumping(GOmni, infos.chr = info_snpBIP$chr, S = lpSBIP, thr.r2 = pr2$r2[x.max_BIP], size = 250, infos.pos = info_snpBIP$pos, ncores = ncores)
 
 # PRS (OmniExpress data set)
 #SKZ
-prs <- snp_PRS(GOmni, betas.keep = info_snpSKZ$beta[ind.keepSKZ], ind.keep = ind.keepSKZ, lpS.keep = lpSSKZ[ind.keepSKZ], thr.list = -log10(0.05))
+prs <- snp_PRS(GOmni, betas.keep = info_snpSKZ$beta[ind.keepSKZ], ind.keep = ind.keepSKZ, lpS.keep = lpSSKZ[ind.keepSKZ], thr.list = -log10(pr2$p[x.max_SKZ]))
 saveRDS(prs, file = paste0("Results/CTOmniSKZ.RDS"))
 #BIP
-prs <- snp_PRS(GOmni, betas.keep = info_snpBIP$beta[ind.keepBIP], ind.keep = ind.keepBIP, lpS.keep = lpSBIP[ind.keepBIP], thr.list = -log10(0.1))
+prs <- snp_PRS(GOmni, betas.keep = info_snpBIP$beta[ind.keepBIP], ind.keep = ind.keepBIP, lpS.keep = lpSBIP[ind.keepBIP], thr.list = -log10(pr2$p[x.max_BIP]))
 saveRDS(prs, file = paste0("Results/CTOmniBIP.RDS"))
 
 # PRS (GSA data set)
 #SKZ
-prs <- snp_PRS(GGSA, betas.keep = info_snpSKZ$beta[ind.keepSKZ], ind.keep = ind.keepSKZ, lpS.keep = lpSSKZ[ind.keepSKZ], thr.list = -log10(0.05))
+prs <- snp_PRS(GGSA, betas.keep = info_snpSKZ$beta[ind.keepSKZ], ind.keep = ind.keepSKZ, lpS.keep = lpSSKZ[ind.keepSKZ], thr.list = -log10(pr2$p[x.max_SKZ]))
 saveRDS(prs, file = paste0("Results/CTGSASKZ.RDS"))
 #BIP
-prs <- snp_PRS(GGSA, betas.keep = info_snpBIP$beta[ind.keepBIP], ind.keep = ind.keepBIP, lpS.keep = lpSBIP[ind.keepBIP], thr.list = -log10(0.1))
+prs <- snp_PRS(GGSA, betas.keep = info_snpBIP$beta[ind.keepBIP], ind.keep = ind.keepBIP, lpS.keep = lpSBIP[ind.keepBIP], thr.list = -log10(pr2$p[x.max_BIP]))
 saveRDS(prs, file = paste0("Results/CTGSABIP.RDS"))
 
 #---- LDPRED2 ----
@@ -560,7 +658,57 @@ for (chr in 1:22) {
   }
 }
 
-#Again, let's use the sumstats format that the bigsnpr authors demands.
+#We chose to test new values of polygenicity, as explain in the original paper.
+vec_p_init <- c(c(0.0001, 0.0005, 0.001, 0.005, 0.01), seq(0.05, 0.5, length.out = 25))
+
+#let's use the sumstats A in the format that the bigsnpr authors demands. (for -grid-sp)
+ssA_SKZ <- ssA_SKZ[, c("SNP", "CHR", "BP", "A1", "A2", "beta", "SE", "P")]
+colnames(ssA_SKZ) <- c("rsid", "chr", "pos", "a1", "a0", "beta", "beta_se", "p")
+ssA_SKZ$n_eff <- 4 / (1 / sizeA_SKZ[2] + 1 / sizeA_SKZ[1])
+ssA_SKZ$beta_se <- ssA_SKZ$beta/(abs(qnorm(p = ssA_SKZ$p/2))*sign(ssA_SKZ$beta))
+dfA_beta_SKZ <- snp_match(ssA_SKZ, mapOmni)
+
+ssA_BIP <- ssA_BIP[, c("ID", "CHR", "POS", "A1", "A2", "beta", "SE", "PVAL")]
+colnames(ssA_BIP) <- c("rsid", "chr", "pos", "a1", "a0", "beta", "beta_se", "p")
+ssA_BIP$n_eff <- 4 / (1 / sizeA_BIP[2] + 1 / sizeA_BIP[1])
+ssA_BIP$beta_se <- ssA_BIP$beta/(abs(qnorm(p = ssA_BIP$p/2))*sign(ssA_BIP$beta))
+dfA_beta_BIP <- snp_match(ssA_BIP, mapOmni)
+
+#Method
+#SKZ
+dfA_beta_SKZ <- as.data.frame(dfA_beta_SKZ)[,c("beta","beta_se","n_eff")]
+ldsc_SKZ <- snp_ldsc(ld, length(ld), chi2 = (dfA_beta_SKZ$beta / dfA_beta_SKZ$beta_se)^2, sample_size = dfA_beta_SKZ$n_eff, blocks = NULL, ncores = ncores)
+h2_est_SKZ <- ldsc_SKZ[[2]]
+h2_seq_SKZ <- round(h2_est_SKZ * c(0.3, 0.7, 1, 1.4), 4)
+paramsA_SKZ <- expand.grid(p = vec_p_init, h2 = h2_seq_SKZ, sparse = TRUE)
+ldpred2_grid_SKZ <- snp_ldpred2_grid(corr0, dfA_beta_SKZ, paramsA_SKZ, ncores = ncores )
+saveRDS(ldpred2_grid_SKZ, file = "Results/LDpred2grid_SKZ.RDS")
+#Let's keep models using parameters that converge only.
+any_nas_SKZ <- apply(ldpred2_grid_SKZ, 2, function(x) any(is.na(x)))
+array_Beta <- array(c(ldpred2_grid_SKZ[,!any_nas_SKZ]), dim = c(nrow(ldpred2_grid_SKZ), sum(!any_nas_SKZ), 1))
+x <- multivariateLassosum::pseudovalidation(omni, beta = array_Beta, cor = cbind(corB_SKZ), destandardize = FALSE)
+x.max_SKZ <- which.max(x)
+paramsA_SKZ <- paramsA_SKZ[!any_nas_SKZ,]
+saveRDS(x, file = "Results/LDpred2grid_SKZ_flambda.RDS")
+
+#BIP
+dfA_beta_BIP <- as.data.frame(dfA_beta_BIP)[,c("beta","beta_se","n_eff")]
+ldsc_BIP <- snp_ldsc(ld, length(ld), chi2 = (dfA_beta_BIP$beta / dfA_beta_BIP$beta_se)^2, sample_size = dfA_beta_BIP$n_eff, blocks = NULL, ncores = ncores)
+h2_est_BIP <- ldsc_BIP[[2]]
+h2_seq_BIP <- round(h2_est_BIP * c(0.3, 0.7, 1, 1.4), 4)
+paramsA_BIP <- expand.grid(p = vec_p_init, h2 = h2_seq_BIP, sparse = TRUE)
+ldpred2_grid_BIP <- snp_ldpred2_grid(corr0, dfA_beta_BIP, paramsA_BIP, ncores = ncores )
+saveRDS(ldpred2_grid_BIP, file = "Results/LDpred2grid_BIP.RDS")
+#Let's keep models using parameters that converge only.
+any_nas_BIP <- apply(ldpred2_grid_BIP, 2, function(x) any(is.na(x)))
+array_Beta <- array(c(ldpred2_grid_BIP[,!any_nas_BIP]), dim = c(nrow(ldpred2_grid_BIP), sum(!any_nas_BIP), 1))
+x <- multivariateLassosum::pseudovalidation(omni, beta = array_Beta, cor = cbind(corB_BIP), destandardize = FALSE)
+x.max_BIP <- which.max(x)
+paramsA_BIP <- paramsA_BIP[!any_nas_BIP,]
+saveRDS(x, file = "Results/LDpred2grid_BIP_flambda.RDS")
+
+#Now, let's use the sumstats format that the bigsnpr authors demands.
+#We run the final -grid-sp models and the -auto models.
 ss_SKZ$beta <- log(ss_SKZ$OR)
 ss_SKZ <- ss_SKZ[, c("SNP", "CHR", "BP", "A1", "A2", "beta", "SE", "P")]
 colnames(ss_SKZ) <- c("rsid", "chr", "pos", "a1", "a0", "beta", "beta_se", "p")
@@ -572,11 +720,37 @@ colnames(ss_BIP) <- c("rsid", "chr", "pos", "a1", "a0", "beta", "beta_se", "p")
 size_BIP <- c(371549, 41917)
 ss_BIP$n_eff <- 4 / (1 / size_BIP[2] + 1 / size_BIP[1])
 df_beta_BIP <- snp_match(ss_BIP, mapOmni)
-
-#We chose to test new values of polygenicity, as explain in the original paper.
-vec_p_init <- c(c(0.0001, 0.0005, 0.001, 0.005, 0.01), seq(0.05, 0.5, length.out = 25))
  
-#LDpred2 for SKZ
+#Final model grid-sp models
+#SKZ
+params_SKZ <- expand.grid(p = paramsA_SKZ[x.max_SKZ,"p"], h2 = paramsA_SKZ[x.max_SKZ,"h2"], sparse = TRUE)
+ldpred2_grid_SKZ <- snp_ldpred2_grid(corr0, df_beta_SKZ, params_SKZ, ncores = ncores)
+saveRDS(ldpred2_grid_SKZ, file = "Results/LDpred2grid_SKZ.RDS")
+final_beta_SKZ <- as.matrix(ldpred2_grid_SKZ)
+#BIP
+params_BIP <- expand.grid(p = paramsA_BIP[x.max_BIP,"p"], h2 = paramsA_BIP[x.max_BIP,"h2"], sparse = TRUE)
+ldpred2_grid_BIP <- snp_ldpred2_grid(corr0, df_beta_BIP, params_BIP, ncores = ncores)
+saveRDS(ldpred2_grid_BIP, file = "Results/LDpred2grid_BIP.RDS")
+final_beta_BIP <- as.matrix(ldpred2_grid_BIP)
+
+# PRS (GSA data set)
+#SKZ
+final_pred_SKZ <- big_prodMat(GOmni, as.matrix(final_beta_SKZ))
+saveRDS(final_pred_SKZ, file = paste0("Results/LDpred2gridOmniSKZ.Rdata"))
+#BIP
+final_pred_BIP <- big_prodMat(GOmni, as.matrix(final_beta_BIP))
+saveRDS(final_pred_BIP, file = paste0("Results/LDpred2gridOmniBIP.Rdata")) 
+
+# PRS (Omni data set)
+#SKZ
+final_pred_SKZ <- big_prodMat(GGSA, as.matrix(final_beta_SKZ))
+saveRDS(final_pred_SKZ, file = paste0("Results/LDpred2gridGSASKZ.Rdata"))
+#BIP
+final_pred_BIP <- big_prodMat(GGSA, as.matrix(final_beta_BIP))
+saveRDS(final_pred_BIP, file = paste0("Results/LDpred2gridGSABIP.Rdata")) 
+
+
+#LDpred2-auto for SKZ
 df_beta_SKZ <- as.data.frame(df_beta_SKZ)[,c("beta","beta_se","n_eff")]
 ldsc_SKZ <- snp_ldsc(ld, length(ld), chi2 = (df_beta_SKZ$beta / df_beta_SKZ$beta_se)^2, sample_size = df_beta_SKZ$n_eff, blocks = NULL, ncores = ncores)
 h2_est_SKZ <- ldsc_SKZ[[2]]
@@ -604,7 +778,7 @@ Beta_SKZ_LDpred2 <- rowMeans(as.data.frame(beta_auto_SKZ_sparse)[, keep])
 final_pred_auto_SKZ <- big_prodVec(GGSA, Beta_SKZ_LDpred2)
 saveRDS(final_pred_auto_SKZ, file = paste0("Results/LDpred2GSASKZ.Rdata"))
 
-#LDpred2 for BIP
+#LDpred2-auto for BIP
 df_beta_BIP <- as.data.frame(df_beta_BIP)[,c("beta","beta_se","n_eff")]
 ldsc_BIP <- snp_ldsc(ld, length(ld), chi2 = (df_beta_BIP$beta / df_beta_BIP$beta_se)^2, sample_size = df_beta_BIP$n_eff, blocks = NULL, ncores = ncores)
 h2_est_BIP <- ldsc_BIP[[2]]

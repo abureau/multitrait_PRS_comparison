@@ -199,29 +199,27 @@ ss_BIP <- ss_BIP[ss_BIP$ID %in% ssA_BIP$ID]
 corB_BIP <- ssB_BIP$Cor
 
 #PANPRS
-Zmatrix <- matrix(c(sign(ssA_SKZ$Cor)*abs(qnorm(p=(ssA_SKZ$P)/2)), sign(ssA_BIP$Cor)*abs(qnorm(p=(ssA_BIP$PVAL)/2))), ncol = 2)
-row.names(Zmatrix) <- omni$V2
+ZmatrixA <- matrix(c(sign(ssA_SKZ$Cor)*abs(qnorm(p=(ssA_SKZ$P)/2)), sign(ssA_BIP$Cor)*abs(qnorm(p=(ssA_BIP$PVAL)/2))), ncol = 2)
+row.names(ZmatrixA) <- omni$V2
 
 #Compute LD matrix using PLINK in the method reference bfiles, OmniExpress.
 system(paste0(pathPlink, " --bfile ", omni, " --ld-window-kb 250 --ld-window-r2 0 --out .../PANPRS/Data/PANPRSLD-RefOmni"))
 plinkLDgenome <- fread("PANPRS/Data/PANPRSLD-RefOmni.ld")
 colnames(plinkLDgenome) <- c("CHR_A", "BP_A",  "SNP_A", "CHR_B", "BP_B",  "SNP_B", "R")
 #Generate the set of tuning parameters on a modified version of gsPEN which doesn't fit the model, but only outputs the tuning matrix.
-initialTuning <- SummaryLasso::gsPEN(summaryZ = Zmatrix, Nvec = c(size_SKZ, size_BIP), plinkLD = plinkLDgenome, numChrs = 2, fit = FALSE) 
+initialTuning <- SummaryLasso::gsPEN(summaryZ = ZmatrixA, Nvec = c(size_SKZ, size_BIP), plinkLD = plinkLDgenome, numChrs = 2, fit = FALSE) 
 
 PANPRSlist <- vector(mode = "list", length = 22)
 for(chr in 1:22){
   plinkLD <- plinkLDgenome[plinkLDgenome$CHR_A == chr & plinkLDgenome$CHR_B == chr,]
   plinkLD <- as.data.frame(plinkLD)
-  ZmatrixChr <- Zmatrix[omnibim$V1 == chr,]
+  ZmatrixChr <- ZmatrixA[omnibim$V1 == chr,]
   PANPRS64chr <- SummaryLasso::gsPEN(summaryZ = ZmatrixChr, Nvec = c(size_SKZ, size_BIP), plinkLD = plinkLD, NumIter = 1000, breaking = 1, 
     numChrs = 1, ChrIndexBeta = 0, Init_summaryBetas = 0, Zscale = 1, 
     RupperVal = NULL, tuningMatrix = initialTuning, penalty = c("mixLOG"), outputAll = 0, fit = TRUE)
   tuningChr <- apply(PANPRS64chr$tuningMatrix, 1, FUN = function(x){paste0(round(x,4), collapse = "-")})
   PANPRSlist[[chr]] <- list(PANPRS64chr, tuningChr)
-  saveRDS(PANPRSlist, "/home/jricard/Projet_Meriem/DonneesReellesMAF/ResultsRefOmni/PANPRSlist.RDS")
 }
-#PANPRSlist <- readRDS("/home/jricard/Projet_Meriem/DonneesReellesMAF/ResultsRefOmni/PANPRSlist.RDS")
 
 tuning <- Reduce(intersect, list(PANPRSlist[[1]][[2]], PANPRSlist[[2]][[2]],
                                  PANPRSlist[[3]][[2]], PANPRSlist[[4]][[2]],
@@ -248,7 +246,6 @@ for(chr in 1:22){
     PANPRS$BetaMatrix <- cbind(PANPRS$BetaMatrix, PANPRSchr$BetaMatrix[tuningCritChr,])
   }
 }
-saveRDS(PANPRS, paste0("PANPRS/Results/PANPRS.RDS"))
 
 #Validation
 whereSKZ <- which(stringr::str_detect(dimnames(PANPRS$BetaMatrix)[[2]], "trait1"))
@@ -267,35 +264,70 @@ x <- multivariateLassosum::pseudovalidation(r = cbind(corB_SKZ, corB_BIP), keep_
 names(x) <- apply(PANPRS$tuningMatrix[DiffZeroCrit,], 1, FUN = function(x){paste0(round(x,4), collapse = "-")})
 saveRDS(x, file = "PANPRS/Results/Valeurs_f_lambda_PANPRS.Rdata")
 
-#Finally, watch out for allele order.
-matchOmni <- lassosum:::matchpos(tomatch = ssA_SKZ, ref.df = omnibim , auto.detect.tomatch = F, auto.detect.ref = F,
-  chr = "CHR", ref.chr = "V1", pos = "BP", ref.pos = "V4", ref = "A1", ref.ref = "V5", alt = "A2", ref.alt = "V6",
-  exclude.ambiguous = F, silent = F, rm.duplicates = F)
-matchGSA <- lassosum:::matchpos(tomatch = ssA_SKZ, ref.df = testGSA.bim , auto.detect.tomatch = F, auto.detect.ref = F,
-  chr = "CHR", ref.chr = "V1", pos = "BP", ref.pos = "V4", ref = "A1", ref.ref = "V5", alt = "A2", ref.alt = "V6",
-  exclude.ambiguous = F, silent = F, rm.duplicates = F)
+#Final model
+Zmatrix <- matrix(c(sign(cor_SKZ)*abs(qnorm(p=(ss_SKZ$P)/2)), sign(cor_BIP)*abs(qnorm(p=(ss_BIP$PVAL)/2))), ncol = 2)
+row.names(Zmatrix) <- omni$V2
+bestParam <- initialTuning[which(tuning == names(which.max(x))),]
+#PANPRS function only use a parameters matrix of nrow>1, let's double the line.
+tuningMatrix <- matrix(c(bestParam,bestParam), nrow = 2, ncol = 4, byrow = TRUE)
+dimnames(tuningMatrix) <- dimnames(initialTuning)
 
+
+PANPRSlist <- vector(mode = "list", length = 22)
+for(chr in 1:22){
+  plinkLD <- plinkLDgenome[plinkLDgenome$CHR_A == chr & plinkLDgenome$CHR_B == chr,]
+  plinkLD <- as.data.frame(plinkLD)
+  ZmatrixChr <- Zmatrix[omnibim$V1 == chr,]
+  PANPRS64chr <- SummaryLasso::gsPEN(summaryZ = ZmatrixChr, Nvec = c(size_SKZ, size_BIP), plinkLD = plinkLD, NumIter = 1000, breaking = 1, 
+                                     numChrs = 1, ChrIndexBeta = 0, Init_summaryBetas = 0, Zscale = 1, 
+                                     RupperVal = NULL, tuningMatrix = tuningMatrix, penalty = c("mixLOG"), outputAll = 0, fit = TRUE)
+  tuningChr <- apply(PANPRS64chr$tuningMatrix, 1, FUN = function(x){paste0(round(x,4), collapse = "-")})
+  PANPRSlist[[chr]] <- list(PANPRS64chr, tuningChr)
+}
+
+tuning <- names(which.max(xPANPRS))
+for(chr in 1:22){
+  if(chr==1){
+    PANPRS <- PANPRSlist[[chr]][[1]]
+    PANPRS$BetaMatrix <- PANPRS$BetaMatrix
+    PANPRS$tuningMatrix <- PANPRS$tuningMatrix
+    PANPRS$Numitervec <- NULL
+  }else{
+    PANPRSchr <- PANPRSlist[[chr]][[1]]
+    PANPRS$BetaMatrix <- cbind(PANPRS$BetaMatrix, PANPRSchr$BetaMatrix)
+  }
+}
+PANPRS$BetaMatrix <- PANPRS$BetaMatrix[1,]
+PANPRS$tuningMatrix <- PANPRS$tuningMatrix[1,]
+saveRDS(PANPRS, "PANPRS/Results/PANPRS.RDS")
+
+#Finally, let's be sure of the SNP order among traits.
+whereSKZ <- which(stringr::str_detect(names(PANPRS$BetaMatrix), "trait1"))
+orderSKZ <- names(PANPRS$BetaMatrix)[whereSKZ]
+orderSKZ <- substr(orderSKZ, 1, nchar(orderSKZ)-7)
+whereBIP <- which(stringr::str_detect(names(PANPRS$BetaMatrix), "trait2"))
+orderBIP <- names(PANPRS$BetaMatrix)[whereBIP]
+orderBIP <- substr(orderBIP, 1, nchar(orderBIP)-7)
+#BIP and SKZ betas are in the same order
+mat_Beta_SKZ <- PANPRS$BetaMatrix[whereSKZ]
+mat_Beta_BIP <- PANPRS$BetaMatrix[whereBIP]
 
 #PRS Omni
-AllLambdas <- names(x)
-AllLambdasMax <- which.max(x)
-Lam <- AllLambdas[AllLambdasMax]
 # SKZ
-scaled.beta_estime_SKZ <- as.matrix(t(mat_Beta_SKZ)[,which(AllLambdas == Lam)])
-PGS_estime_SKZ <- pgs(omni, weights=scaled.beta_estime_SKZ)
+beta_estime_SKZ <- as.matrix(mat_Beta_SKZ)
+PGS_estime_SKZ <- pgs(omni, weights=beta_estime_SKZ)
 saveRDS(PGS_estime_SKZ, file = paste0("PANPRS/Results/PANPRSOmniSKZ.RDS"))
 # BIP 
-scaled.beta_estime_BIP <- as.matrix(t(mat_Beta_BIP)[,which(AllLambdas == Lam)])
-PGS_estime_BIP <- pgs(omni, weights=scaled.beta_estime_BIP)
+beta_estime_BIP <- as.matrix(mat_Beta_BIP)
+PGS_estime_BIP <- pgs(omni, weights=beta_estime_BIP)
 saveRDS(PGS_estime_BIP, file = paste0("PANPRS/Results/PANPRSOmniBIP.RDS"))
 
 #PRS GSA
 # SKZ
-scaled.beta_estime_SKZ <- as.matrix(t(mat_Beta_SKZ)[,which(AllLambdas == Lam)])
-PGS_estime_SKZ <- pgs(GSA, weights=scaled.beta_estime_SKZ)
+beta_estime_SKZ <- as.matrix(mat_Beta_SKZ)
+PGS_estime_SKZ <- pgs(GSA, weights=beta_estime_SKZ)
 saveRDS(PGS_estime_SKZ, file = paste0("PANPRS/Results/PANPRSGSASKZ.RDS"))
 # BIP 
-scaled.beta_estime_BIP <- as.matrix(t(mat_Beta_BIP)[,which(AllLambdas == Lam)])
-PGS_estime_BIP <- pgs(GSA, weights=scaled.beta_estime_BIP)
+beta_estime_BIP <- as.matrix(mat_Beta_BIP)
+PGS_estime_BIP <- pgs(GSA, weights=beta_estime_BIP)
 saveRDS(PGS_estime_BIP, file = paste0("PANPRS/Results/PANPRSGSABIP.RDS"))
-

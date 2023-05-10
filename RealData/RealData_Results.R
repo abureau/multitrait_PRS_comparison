@@ -312,6 +312,8 @@ prs_ml_BIP4 <- readRDS(paste0(path, "OGOmniBIP.RDS"))
 prs_ml_SKZ4 <- readRDS(paste0(path, "OGOmniSKZ.RDS"))
 prs_ml_SKZ5 <- readRDS(paste0(path, "multiGenCovOmniSKZ.RDS"))
 prs_ml_BIP5 <- readRDS(paste0(path, "multiGenCovOmniBIP.RDS"))
+prs_ml_SKZ7 <- readRDS(paste0(path, "LDpred2gridOmniSKZ.Rdata")) %>% as.matrix()
+prs_ml_BIP7 <- readRDS(paste0(path, "LDpred2gridOmniBIP.Rdata")) %>% as.matrix()
 prs_ml_SKZ8 <- readRDS(paste0(path, "LDpred2OmniSKZ.Rdata")) %>% as.matrix()
 prs_ml_BIP8 <- readRDS(paste0(path, "LDpred2OmniBIP.Rdata")) %>% as.matrix()
 prs_ml_SKZ9 <- readRDS(paste0(path, "PANPRSOmniSKZ.RDS")) %>% as.matrix()
@@ -328,6 +330,8 @@ gsa_prs_ml_SKZ4 <- readRDS(paste0(path, "OGGSASKZ.RDS"))
 gsa_prs_ml_BIP4 <- readRDS(paste0(path, "OGGSABIP.RDS"))
 gsa_prs_ml_SKZ5 <- readRDS(paste0(path, "multiGenCovGSASKZ.RDS"))
 gsa_prs_ml_BIP5 <- readRDS(paste0(path, "multiGenCovGSABIP.RDS"))
+gsa_prs_ml_SKZ7 <- readRDS(paste0(path, "LDpred2gridGSASKZ.Rdata")) %>% as.matrix()
+gsa_prs_ml_BIP7 <- readRDS(paste0(path, "LDpred2gridGSABIP.Rdata")) %>% as.matrix()
 gsa_prs_ml_SKZ8 <- readRDS(paste0(path, "LDpred2GSASKZ.Rdata")) %>% as.matrix()
 gsa_prs_ml_BIP8 <- readRDS(paste0(path, "LDpred2GSABIP.Rdata")) %>% as.matrix()
 gsa_prs_ml_SKZ9 <- readRDS(paste0(path, "PANPRSGSASKZ.RDS")) %>% as.matrix()
@@ -335,8 +339,8 @@ gsa_prs_ml_BIP9 <- readRDS(paste0(path, "PANPRSGSABIP.RDS")) %>% as.matrix()
 
 #Methods labels
 methods <- c("SCORE_CT_SKZ", "SCORE_CT_BIP", "SCORE_THRESHOLD_SKZ", "SCORE_THRESHOLD_BIP",
-             "SCORE_ML_SKZ", "SCORE_ML_BIP", "SCORE_OG_SKZ", "SCORE_OG_BIP",
-             "SCORE_GC_SKZ", "SCORE_GC_BIP", "SCORE_LDPRED2_SKZ", "SCORE_LDPRED2_BIP", "SCORE_PP_SKZ", "SCORE_PP_BIP"
+             "SCORE_ML_SKZ", "SCORE_ML_BIP", "SCORE_OG_SKZ", "SCORE_OG_BIP", "SCORE_GC_SKZ", "SCORE_GC_BIP",
+             "SCORE_LDPRED2GRID_SKZ", "SCORE_LDPRED2GRID_BIP","SCORE_LDPRED2_SKZ", "SCORE_LDPRED2_BIP", "SCORE_PP_SKZ", "SCORE_PP_BIP"
 )
 methodsSKZ <- stringr::str_subset(methods, pattern = "_SKZ")
 methodsBIP <- stringr::str_subset(methods, pattern = "_BIP")
@@ -350,6 +354,7 @@ methodsToNames <- function(x){
                    x %in% c("SCORE_ML_SKZ", "SCORE_ML_BIP") ~ "mvL",
                    x %in% c("SCORE_GC_SKZ", "SCORE_GC_BIP") ~ "mvL(BLD-X)",
                    x %in% c("SCORE_LDPRED2_SKZ", "SCORE_LDPRED2_BIP") ~ "LDpred2",
+                   x %in% c("SCORE_LDPRED2GRID_SKZ", "SCORE_LDPRED2GRID_BIP") ~ "LDpred2grid",
                    x == "SCORE_OG_BIP" ~ "OG",
                    x == "SCORE_OG_SKZ" ~ "OG",
                    x %in% c("SCORE_PP_SKZ", "SCORE_PP_BIP") ~ "PANPRS") %>%
@@ -360,13 +365,13 @@ methodsToNames <- function(x){
 #---- BIP ET SKZ ----
 #En faire un seul jeu de donn?es de PRS
 prs <- data.frame(omniID, prs_ml_SKZ[, 1], prs_ml_BIP[, 1], prs_ml_SKZ2[, 1], prs_ml_BIP2[, 1],
-                  prs_ml_SKZ3[, 1], prs_ml_BIP3[, 1], prs_ml_SKZ4[, 1], prs_ml_BIP4[, 1],
-                  prs_ml_SKZ5[, 1], prs_ml_BIP5[, 1], prs_ml_SKZ8[, 1], prs_ml_BIP8[, 1], prs_ml_SKZ9[, 1], prs_ml_BIP9[, 1]
+                  prs_ml_SKZ3[, 1], prs_ml_BIP3[, 1], prs_ml_SKZ4[, 1], prs_ml_BIP4[, 1], prs_ml_SKZ5[, 1], prs_ml_BIP5[, 1],
+                  prs_ml_SKZ7[, 1], prs_ml_BIP7[, 1], prs_ml_SKZ8[, 1], prs_ml_BIP8[, 1], prs_ml_SKZ9[, 1], prs_ml_BIP9[, 1]
 ) %>%
   setNames(., c("FID", "IID", methods))
 gsa_prs <- data.frame(gsaID, gsa_prs_ml_SKZ[, 1], gsa_prs_ml_BIP[, 1], gsa_prs_ml_SKZ2[, 1], gsa_prs_ml_BIP2[, 1],
-                      gsa_prs_ml_SKZ3[, 1], gsa_prs_ml_BIP3[, 1], gsa_prs_ml_SKZ4[, 1], gsa_prs_ml_BIP4[, 1],
-                      gsa_prs_ml_SKZ5[, 1], gsa_prs_ml_BIP5[, 1], gsa_prs_ml_SKZ8[, 1], gsa_prs_ml_BIP8[, 1], gsa_prs_ml_SKZ9[, 1], gsa_prs_ml_BIP9[, 1]
+                      gsa_prs_ml_SKZ3[, 1], gsa_prs_ml_BIP3[, 1], gsa_prs_ml_SKZ4[, 1], gsa_prs_ml_BIP4[, 1], gsa_prs_ml_SKZ5[, 1], gsa_prs_ml_BIP5[, 1],
+                      gsa_prs_ml_SKZ7[, 1], gsa_prs_ml_BIP7[, 1], gsa_prs_ml_SKZ8[, 1], gsa_prs_ml_BIP8[, 1], gsa_prs_ml_SKZ9[, 1], gsa_prs_ml_BIP9[, 1]
 ) %>%
   setNames(., c("FID", "IID", methods))
 
@@ -402,12 +407,12 @@ out3 <- rbind(out3,
 #En faire un seul jeu de donn?es de PRS
 prs <- data.frame(omniID, prs_ml_BIP[, 1], prs_ml_BIP2[, 1],
                   prs_ml_BIP3[, 1], prs_ml_BIP4[, 1],
-                  prs_ml_BIP5[, 1], prs_ml_BIP8[, 1], prs_ml_BIP9[, 1]
+                  prs_ml_BIP5[, 1], prs_ml_BIP7[, 1], prs_ml_BIP8[, 1], prs_ml_BIP9[, 1]
 ) %>%
   setNames(., c("FID", "IID", methodsBIP))
 gsa_prs <- data.frame(gsaID, gsa_prs_ml_BIP[, 1], gsa_prs_ml_BIP2[, 1],
                       gsa_prs_ml_BIP3[, 1], gsa_prs_ml_BIP4[, 1],
-                      gsa_prs_ml_BIP5[, 1], gsa_prs_ml_BIP8[, 1], gsa_prs_ml_BIP9[, 1]
+                      gsa_prs_ml_BIP5[, 1], gsa_prs_ml_BIP7[, 1], gsa_prs_ml_BIP8[, 1], gsa_prs_ml_BIP9[, 1]
 ) %>%
   setNames(., c("FID", "IID", methodsBIP))
 
@@ -429,12 +434,12 @@ out3 <- rbind(out3,
 #En faire un seul jeu de donn?es de PRS
 prs <- data.frame(omniID, prs_ml_SKZ[, 1], prs_ml_SKZ2[, 1],
                   prs_ml_SKZ3[, 1], prs_ml_SKZ4[, 1],
-                  prs_ml_SKZ5[, 1], prs_ml_SKZ8[, 1], prs_ml_SKZ9[, 1]
+                  prs_ml_SKZ5[, 1], prs_ml_SKZ7[, 1], prs_ml_SKZ8[, 1], prs_ml_SKZ9[, 1]
 ) %>%
   setNames(., c("FID", "IID", methodsSKZ))
 gsa_prs <- data.frame(gsaID, gsa_prs_ml_SKZ[, 1], gsa_prs_ml_SKZ2[, 1],
                       gsa_prs_ml_SKZ3[, 1], gsa_prs_ml_SKZ4[, 1],
-                      gsa_prs_ml_SKZ5[, 1], gsa_prs_ml_SKZ8[, 1], gsa_prs_ml_SKZ9[, 1]
+                      gsa_prs_ml_SKZ5[, 1], gsa_prs_ml_SKZ7[, 1], gsa_prs_ml_SKZ8[, 1], gsa_prs_ml_SKZ9[, 1]
 ) %>%
   setNames(., c("FID", "IID", methodsSKZ))
 
@@ -453,12 +458,12 @@ out3 <- rbind(out3,
 #En faire un seul jeu de donn?es de PRS
 prs <- data.frame(omniID, prs_ml_SKZ[, 1], prs_ml_SKZ2[, 1],
                   prs_ml_SKZ3[, 1], prs_ml_SKZ4[, 1],
-                  prs_ml_SKZ5[, 1], prs_ml_SKZ8[, 1], prs_ml_SKZ9[, 1]
+                  prs_ml_SKZ5[, 1], prs_ml_SKZ7[, 1], prs_ml_SKZ8[, 1], prs_ml_SKZ9[, 1]
 ) %>%
   setNames(., c("FID", "IID", methodsSKZ))
 gsa_prs <- data.frame(gsaID, gsa_prs_ml_SKZ[, 1], gsa_prs_ml_SKZ2[, 1],
                       gsa_prs_ml_SKZ3[, 1], gsa_prs_ml_SKZ4[, 1],
-                      gsa_prs_ml_SKZ5[, 1], gsa_prs_ml_SKZ8[, 1], gsa_prs_ml_SKZ9[, 1]
+                      gsa_prs_ml_SKZ5[, 1], gsa_prs_ml_SKZ7[, 1], gsa_prs_ml_SKZ8[, 1], gsa_prs_ml_SKZ9[, 1]
 ) %>%
   setNames(., c("FID", "IID", methodsSKZ))
 
@@ -480,12 +485,12 @@ out3 <- rbind(out3,
 #En faire un seul jeu de donn?es de PRS
 prs <- data.frame(omniID, prs_ml_BIP[, 1], prs_ml_BIP2[, 1],
                   prs_ml_BIP3[, 1], prs_ml_BIP4[, 1],
-                  prs_ml_BIP5[, 1], prs_ml_BIP8[, 1], prs_ml_BIP9[, 1]
+                  prs_ml_BIP5[, 1], prs_ml_BIP7[, 1], prs_ml_BIP8[, 1], prs_ml_BIP9[, 1]
 ) %>%
   setNames(., c("FID", "IID", methodsBIP))
 gsa_prs <- data.frame(gsaID, gsa_prs_ml_BIP[, 1], gsa_prs_ml_BIP2[, 1],
                       gsa_prs_ml_BIP3[, 1], gsa_prs_ml_BIP4[, 1],
-                      gsa_prs_ml_BIP5[, 1], gsa_prs_ml_BIP8[, 1], gsa_prs_ml_BIP9[, 1]
+                      gsa_prs_ml_BIP5[, 1], gsa_prs_ml_BIP7[, 1], gsa_prs_ml_BIP8[, 1], gsa_prs_ml_BIP9[, 1]
 ) %>%
   setNames(., c("FID", "IID", methodsBIP))
 
