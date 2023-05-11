@@ -172,6 +172,7 @@ saveRDS(h, paste0(path, "S-LDXR/h_rho_bysnp.RDS"))
 #This `for` loop will set the parameters needed for each simulation.
 #Please enter the simulation type. It needs to be written the same ways as it is in the original paper of this project:
 #"n = 29,330", "n = 10,139", "n = 29,330; Low Polygenicity", "n = 29,330; Moderate Correlation" or "29300ind_moderateCor/".
+#To simulate an overlap of the samples for the two traits, use "n = 29,330; Overlap"
 simuType <- "..."
 set.seed(42)
 pathBase <- path
@@ -182,6 +183,7 @@ if(simuType=="n = 29,330"){
   Correlation <- 0.59
   sigma2 <- 2.263e-6
   pi1 <- 0.35
+  rho.overlap <- 0
   path <- paste0(path, "29300ind/")
 }else if(simuType=="n = 10,139"){
   n.1 <- 8139; n.2 <- 9139; nbr_ind <- 10139
@@ -189,6 +191,7 @@ if(simuType=="n = 29,330"){
   Correlation <- 0.59
   sigma2 <- 2e-6
   pi1 <- 0.35
+  rho.overlap <- 0
   path <- paste0(path, "10139ind/")
 }else if(simuType=="n = 29,330; Low Polygenicity"){
   n.1 <- 23330; n.2 <- 26330; nbr_ind <- 29330
@@ -196,6 +199,7 @@ if(simuType=="n = 29,330"){
   Correlation <- 0.59
   sigma2 <- 1.06244e-05
   pi1 <- 0.08
+  rho.overlap <- 0
   path <- paste0(path, "29300ind_lowPoly/")
 }else if(simuType=="n = 29,330; Low Heritability"){
   n.1 <- 23330; n.2 <- 26330; nbr_ind <- 29330
@@ -203,14 +207,22 @@ if(simuType=="n = 29,330"){
   Correlation <- 0.59
   sigma2 <- 4.53e-7
   pi1 <- 0.35
+  rho.overlap <- 0
   path <- paste0(path, "29300ind_lowHeri/")
-}else{
+}else if(simuType=="n = 29,330; Overlap"){
+  n.1 <- 23330; n.2 <- 26330; nbr_ind <- 29330
+  h_obs_SKZ <- 0.47; h_obs_BIP <- 0.45
+  Correlation <- 0.59
+  sigma2 <- 2.263e-6
+  pi1 <- 0.35
+  path <- paste0(path, "29300ind_overlap/")
+  rho.overlap <- 0.1635382*2
+} else{
   warning("Please provide an actual simulation scenario, written as it is in the original paper of this project.")
 }
 
 parsed <- parseselect(DataFile,extract = NULL, exclude = NULL,keep = NULL, remove = NULL,chr = NULL)
 nbr_SNP <- parsed$P
-rho.overlap <- 0
 rows_randomized <- sample(nbr_ind)
 keep.1 <- c(rep(FALSE, nbr_ind))
 keep.1[rows_randomized[1:n.1]] <- TRUE

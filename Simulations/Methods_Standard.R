@@ -37,6 +37,7 @@ pathBase <- ".../"
 #This `for` loop will set the parameters needed for each simulation.
 #Please enter the simulation type. It needs to be written the same ways as it is in the original paper of this project:
 #"n = 29,330", "n = 10,139", "n = 29,330; Low Polygenicity", "n = 29,330; Moderate Correlation" or "29300ind_moderateCor/".
+#If an overlap between traits was simulated, you can now use "n = 29,330; Overlap"
 simuType <- "..."
 set.seed(42)
 
@@ -75,6 +76,13 @@ if(simuType=="n = 29,330"){
   sigma2 <- 2.263e-6
   pi1 <- 0.35
   path <- paste0(pathBase, "29300ind_moderateCor/")
+}(simuType=="n = 29,330; Overlap"){
+  n.1 <- 23330; n.2 <- 26330; nbr_ind <- 29330
+  h_obs_SKZ <- 0.47; h_obs_BIP <- 0.45
+  Correlation <- 0.59
+  sigma2 <- 2.263e-6
+  pi1 <- 0.35
+  path <- paste0(pathBase, "29300ind_overlap/")
 }else{
   warning("Please provide an actual simulation scenario, written as it is in the original paper of this project.")
 }

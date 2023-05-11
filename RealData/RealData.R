@@ -543,7 +543,7 @@ lpSBIP <- -log10(info_snpBIP$p)
 
 
 #Thresholding
-p <- data.frame(p = c(1e-4, 0.001, seq(from = 0.5, to = 1, length.out = 20)))
+p <- data.frame(p = c(1e-4, 0.001, seq(from = 0.05, to = 1, length.out = 20)))
 array_BetaSKZ <- array(NA, dim = c(nrow(info_snpSKZ), nrow(p), 1))
 array_BetaBIP <- array(NA, dim = c(nrow(info_snpBIP), nrow(p), 1))
 for(t in p$p){
@@ -566,7 +566,7 @@ saveRDS(p, file = "Results/T_flambda.RDS")
 
 
 #Clumping + thresholding
-p2 <- c(1e-4, 0.001, seq(from = 0.5, to = 1, length.out = 20))
+p2 <- c(1e-4, 0.001, seq(from = 0.05, to = 1, length.out = 20))
 r2 <- c(0.01, 0.05, 0.1, 0.2, 0.5, 0.8, 0.95)
 pr2 <- data.frame(r2 = rep(r2, each = length(p2)), p = p2)
 array_BetaSKZ <- array(NA, dim = c(nrow(info_snpSKZ), nrow(pr2), 1))
@@ -661,7 +661,8 @@ for (chr in 1:22) {
 #We chose to test new values of polygenicity, as explain in the original paper.
 vec_p_init <- c(c(0.0001, 0.0005, 0.001, 0.005, 0.01), seq(0.05, 0.5, length.out = 25))
 
-#let's use the sumstats A in the format that the bigsnpr authors demands. (for -grid-sp)
+#let's use the sumstats A in the format that the bigsnpr authors demands
+#to run LDpred2-grid-sp.
 ssA_SKZ <- ssA_SKZ[, c("SNP", "CHR", "BP", "A1", "A2", "beta", "SE", "P")]
 colnames(ssA_SKZ) <- c("rsid", "chr", "pos", "a1", "a0", "beta", "beta_se", "p")
 ssA_SKZ$n_eff <- 4 / (1 / sizeA_SKZ[2] + 1 / sizeA_SKZ[1])

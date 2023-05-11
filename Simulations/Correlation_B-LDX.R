@@ -7,7 +7,8 @@ pathBase <- ".../"
 #Please specify which kind of scenario you want to simulate.
 #This `for` loop will set the parameters needed for each simulation.
 #Please enter the simulation type. It needs to be written the same ways as it is in the original paper of this project:
-#"n = 29,330", "n = 10,139", "n = 29,330; Low Polygenicity", "n = 29,330; Moderate Correlation" or "29300ind_moderateCor/".
+#"n = 29,330", "n = 10,139", "n = 29,330; Low Polygenicity", "n = 29,330; Moderate Correlation" or "29300ind_moderateCor/".#If an overlap between both trait was simulated, you can now use "n = 29,330; Overlap"
+#If an overlap between traits was simulated, you can now use "n = 29,330; Overlap"
 simuType <- "..."
 
 if(simuType=="n = 29,330"){
@@ -18,6 +19,8 @@ if(simuType=="n = 29,330"){
   path <- paste0(pathBase, "29300ind_lowPoly/")
 }else if(simuType=="n = 29,330; Low Heritability"){
   path <- paste0(pathBase, "29300ind_lowHeri/")
+}else if(simuType=="n = 29,330; Overlap"){
+  path <- paste0(pathBase, "29300ind_overlap/")
 }else{
   warning("Please provide an actual simulation scenario, written as it is in the original paper of this project.")
 }
